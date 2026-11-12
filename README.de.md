@@ -28,8 +28,8 @@ Kategorien:
 ## 📸 Screenshot
 
 <p align="center">
-  <img src="docs/screenshot-de-combination.png" alt="Heroic-Bibliothek mit von heroic-autotag angelegten Kategorien" width="800">
-  <br><sub>Heroics Kategorien-Filter mit den von heroic-autotag angelegten Kategorien und Kombis</sub>
+  <img src="docs/screenshot-de-rennspiele.png" alt="Heroic-Bibliothek, gefiltert nach der Kategorie Genre: Rennspiele" width="800">
+  <br><sub>Heroics Kategorien-Filter mit den von heroic-autotag angelegten Kategorien, hier <i>Genre: Rennspiele</i></sub>
 </p>
 
 ## ✨ Funktionen
@@ -223,6 +223,11 @@ name.de = Controller + Koop + Steam Machine
 | 1 | Controller (voll oder teilweise) UND (Splitscreen oder Koop) UND Steam Machine (verifiziert oder spielbar) |
 | 2 | Controller (voll oder teilweise) UND (Splitscreen oder Koop) UND SteamOS-kompatibel |
 | 3 | Controller (voll oder teilweise) UND (SteamOS-kompatibel oder Steam Machine verifiziert/spielbar) |
+
+<p align="center">
+  <img src="docs/screenshot-de-combination.png" alt="Heroic, gefiltert nach der Standard-Kombi #3" width="800">
+  <br><sub>Die Kombis stehen ganz oben in der Liste, hier <i>#3 Controller + Steam Machine oder SteamOS</i></sub>
+</p>
 
 **Regeln** verwenden die Schlüssel aus den Abschnitten in der Form `gruppe.schlüssel` (z. B. `controller.full`, `mode.coop`, `genre.rpg`, `machine.verified`, `steamos.compatible`, `metacritic.90`, `reviews.very_positive`):
 

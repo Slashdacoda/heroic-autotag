@@ -28,8 +28,8 @@ Categories:
 ## 📸 Screenshot
 
 <p align="center">
-  <img src="docs/screenshot-de-combination.png" alt="Heroic library with categories created by heroic-autotag (German)" width="800">
-  <br><sub>Heroic's category filter with the categories and combinations created by heroic-autotag (German language)</sub>
+  <img src="docs/screenshot-de-rennspiele.png" alt="Heroic library filtered by the category Genre: Racing (German)" width="800">
+  <br><sub>Heroic's category filter with the categories created by heroic-autotag, here <i>Genre: Racing</i> (German language)</sub>
 </p>
 
 ## ✨ Features
@@ -223,6 +223,11 @@ name.de = Controller + Koop + Steam Machine
 | 1 | controller (full or partial) AND (split screen or co-op) AND Steam Machine (verified or playable) |
 | 2 | controller (full or partial) AND (split screen or co-op) AND SteamOS compatible |
 | 3 | controller (full or partial) AND (SteamOS compatible or Steam Machine verified/playable) |
+
+<p align="center">
+  <img src="docs/screenshot-de-combination.png" alt="Heroic filtered by the default combination #3" width="800">
+  <br><sub>The combinations appear at the top of the list, here <i>#3 Controller + Steam Machine or SteamOS</i> (German language)</sub>
+</p>
 
 **Rules** use the keys from the sections, written as `group.key` (e.g. `controller.full`, `mode.coop`, `genre.rpg`, `machine.verified`, `steamos.compatible`, `metacritic.90`, `reviews.very_positive`):
 
