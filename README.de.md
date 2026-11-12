@@ -12,18 +12,23 @@
 
 Sortiert deine Bibliothek im [Heroic Games Launcher](https://heroicgameslauncher.com) automatisch in Kategorien ein: Controller-Unterstützung, Spielmodi (Koop, Splitscreen, …), Genres, Bewertungen (Metacritic, Steam) sowie Kompatibilität mit Steam Machine, Steam Deck und SteamOS.
 
-Eine einzige Python-Datei, nur Standardbibliothek. Kein Konto, kein API-Schlüssel. Funktioniert mit der nativen Heroic-Installation und mit der Flatpak-Version (SteamOS, Steam Machine, Steam Deck).
+📄 eine Python-Datei · 📦 nur Standardbibliothek · 🔑 kein Konto, kein API-Schlüssel · 🐧 nativ und Flatpak (SteamOS, Steam Machine, Steam Deck) · 🌍 fünf Sprachen
 
-```
-[  12/50] Celeste                                    ok (Steam)
-[  13/50] Akalabeth: World of Doom                   ok (PCGamingWiki)
+> [!TIP]
+> **Alle Optionen mit Beispielen:** `python3 heroic_autotag.py --help` · **Klappt etwas nicht?** → [Hilfe bei Problemen](#-hilfe-bei-problemen)
 
-Kategorien:
-  Controller: voll                     117 Spiele
-  Modus: Couch-Koop                     15 Spiele
-  Steam Machine: verifiziert            87 Spiele
-  ...
-```
+### Was deine Spiele bekommen
+
+| Spiel | 🎮 Controller | 👥 Modi | 🏷️ Genres | ⭐ Bewertungen | 🕹️ Steam Deck |
+|---|---|---|---|---|---|
+| Disco Elysium – The Final Cut | voll | Einzelspieler | Rollenspiel | Metacritic 90+ · Sehr positiv | verifiziert |
+| LEGO Star Wars: Classic Obi-Wan | voll | Koop, Couch-Koop, Splitscreen, Remote Play Together | Action, Abenteuer | Metacritic 70–79 · Sehr positiv | verifiziert |
+| Overcooked: Gourmet Edition | voll | Koop, Couch-Koop, Splitscreen, PvP | Action, Gelegenheitsspiele, Simulationen | Metacritic 80–89 | – |
+| Akalabeth: World of Doom¹ | – | Einzelspieler | Rollenspiel | – | – |
+
+<sub>¹ nicht auf Steam, Daten von PCGamingWiki. Echte Ergebnisse aus einer Bibliothek mit rund 1.100 Spielen.</sub>
+
+Dazu kommen **Kombis** wie *#1 Controller + Koop + Steam Machine*, die ganz oben in Heroics Kategorienliste stehen.
 
 ## 📸 Screenshot
 
@@ -68,6 +73,55 @@ Oder lade nur `heroic_autotag.py` herunter (und `steam-gamemode.sh` für den Spi
    ```
 3. Heroic starten, in der Bibliothek den Kategorien-Filter öffnen und eine Kategorie wählen.
 
+> [!TIP]
+> `python3 heroic_autotag.py --help` zeigt alle Optionen mit kurzer Beschreibung und Beispielaufrufen, in deiner Sprache.
+
+So sieht ein Lauf aus (gekürzt, hier mit 80 neuen Spielen):
+
+```console
+$ python3 heroic_autotag.py
+Heroic (nativ): /home/user/.config/heroic
+1168 Spiele in Heroic, 1088 davon schon im Cache.
+80 Spiele werden abgefragt (4 Threads), geschätzt ca. 2 Minuten.
+Abbrechen mit Strg+C ist jederzeit möglich, der Fortschritt bleibt erhalten.
+
+[   1/80] Brothers: A Tale of Two Sons                            ok (Steam)
+[   2/80] Moving Out                                              ok (Steam)
+[   3/80] Akalabeth: World of Doom                                ok (PCGamingWiki)
+[   4/80] Supraland                                               ok (Steam)
+[   5/80] Vagrus - The Riven Realms: Prologue                     nicht gefunden
+  …
+[  79/80] Crossed Swords                                          ok (PCGamingWiki)
+[  80/80] Blazing Sails                                           ok (Steam)
+Steam-Bewertungen für 72 Spiele werden abgefragt …
+
+Kombis:
+  #1 Controller + Koop + Steam Machine           192 Spiele
+  #2 Controller + Koop + SteamOS                 193 Spiele
+  #3 Controller + Steam Machine oder SteamOS     677 Spiele
+
+Kategorien:
+  Controller: teilweise                          153 Spiele
+  Controller: voll                               687 Spiele
+  Genre: Action                                  552 Spiele
+  Genre: Rollenspiel                             284 Spiele
+  Metacritic: 80–89                              202 Spiele
+  Metacritic: 90+                                 17 Spiele
+  Modus: Couch-Koop                              118 Spiele
+  Modus: Splitscreen                             182 Spiele
+  Steam Deck: verifiziert                        422 Spiele
+  Steam Machine: verifiziert                     515 Spiele
+  Steam-Bewertungen: Äußerst positiv              63 Spiele
+  SteamOS: kompatibel                            815 Spiele
+  …
+  (Quelle: Steam)                               1008
+  (Quelle: PCGamingWiki)                          73
+  (nirgends gefunden)                             54
+
+Fertig! Sicherung: /home/user/.config/heroic/store/config.json.bak-20261112-031502
+54 Spiele nirgends gefunden – Liste mit  --list-unknown
+```
+
 Der erste Lauf dauert etwa 1,5–2 Sekunden pro Spiel, weil Steam die Anzahl der Abfragen begrenzt. Danach kommt alles aus dem Cache, und ein Lauf dauert nur noch Sekunden.
 
 **Tipp für große Bibliotheken:** Den langsamen Teil laufen lassen, während Heroic offen bleibt, und danach in Sekunden schreiben:
@@ -79,31 +133,119 @@ python3 heroic_autotag.py --write       # vorher Heroic schließen
 
 ## ⚙️ Bedienung
 
+Alle Optionen mit kurzer Beschreibung und Beispielen, in deiner Sprache:
+
+```bash
+python3 heroic_autotag.py --help
+```
+
+**Was soll passieren** (ohne eine dieser Optionen: Daten sammeln und Kategorien schreiben)
+
 | Option | Wirkung |
 |---|---|
-| *(keine)* | Daten sammeln und Kategorien schreiben |
 | `--collect` | nur Daten in den Cache holen (Heroic darf offen bleiben) |
 | `--write` | nur Kategorien aus dem Cache schreiben (Heroic muss geschlossen sein) |
-| `--dry-run` | Ergebnis anzeigen, nichts schreiben |
-| `--max N` | höchstens N neue Spiele pro Lauf abfragen |
-| `--threads N` | parallele Threads (Standard 4) |
-| `--language en\|de\|es\|it\|fr` | Sprache der Kategorien und Ausgaben |
-| `--without GRUPPE …` | Gruppen weglassen: `controller`, `mode`, `genre`, `machine`, `deck`, `steamos`, `metacritic`, `reviews` |
-| `--refresh TAGE` | Cache-Einträge älter als TAGE neu abfragen (Bewertungen ändern sich) |
+| `--test N\|TITEL …` | Spiele online testen, ohne etwas zu schreiben (siehe [Testen](#-testen)) |
 | `--top N` | die N am besten bewerteten Spiele auflisten (Metacritic, dann Steam-Bewertung) |
-| `--rule "…"` | mit `--top`: nur Spiele, die eine Regel erfüllen, z. B. `"mode.coop & controller.full"` |
-| `--backfill-ratings` | fehlende Metacritic-Werte für Spiele im Cache nachladen |
-| `--retry-unknown` | nicht gefundene Spiele erneut suchen |
 | `--list-unknown` | nirgends gefundene Spiele auflisten |
 | `--template` | nicht gefundene Spiele als Vorlage in die Datei für eigene Zuordnungen eintragen |
-| `--test "Titel"` | zeigen, was Steam und PCGamingWiki zu einem Titel liefern |
 | `--init-config` | `categories.ini` mit allen Kategorien und den Standard-Kombis erzeugen |
-| `--force` | vorhandene `categories.ini` überschreiben (mit `--init-config`) |
-| `--config DATEI` | andere Einstellungsdatei verwenden |
-| `--flatpak` / `--native` | Heroic-Installation erzwingen (wird normalerweise automatisch erkannt) |
-| `--new` | Cache ignorieren und alles neu abfragen |
+| `-h`, `--help` | alle Optionen und Beispiele anzeigen |
 
-Die deutschen Optionsnamen früherer Versionen (`--sammeln`, `--schreiben`, `--ohne`, …) funktionieren weiterhin.
+**Abfragen**
+
+| Option | Wirkung |
+|---|---|
+| `--max N` | höchstens N neue Spiele pro Lauf abfragen |
+| `--threads N` | parallele Threads (Standard 4) |
+| `--new` | Cache ignorieren und alles neu abfragen |
+| `--retry-unknown` | nicht gefundene Spiele erneut suchen |
+| `--refresh DAYS` | Cache-Einträge älter als DAYS Tage neu abfragen (Bewertungen ändern sich) |
+
+**Kategorien und Ausgabe**
+
+| Option | Wirkung |
+|---|---|
+| `--dry-run` | Ergebnis anzeigen, nichts schreiben |
+| `--rule "…"` | mit `--top`: nur Spiele, die eine Regel erfüllen, z. B. `"mode.coop & controller.full"` |
+| `-v`, `--verbose` | mit `--test`: zusätzlich die Rohdaten von Steam / PCGamingWiki zeigen |
+| `--without GRUPPE …` | Gruppen weglassen: `controller`, `mode`, `genre`, `machine`, `deck`, `steamos`, `metacritic`, `reviews` |
+| `--language en\|de\|es\|it\|fr` | Sprache der Kategorien und Ausgaben |
+
+**Heroic und Einstellungen**
+
+| Option | Wirkung |
+|---|---|
+| `--flatpak` / `--native` | Heroic-Installation erzwingen (wird normalerweise automatisch erkannt) |
+| `--config DATEI` | andere Einstellungsdatei verwenden |
+| `--force` | vorhandene `categories.ini` überschreiben (mit `--init-config`) |
+
+## 💡 Beispiele
+
+```bash
+# normaler Lauf: Daten sammeln und Kategorien schreiben (vorher Heroic schließen)
+python3 heroic_autotag.py
+
+# ansehen, was passieren würde, nichts schreiben
+python3 heroic_autotag.py --dry-run
+
+# große Bibliothek: abfragen, während Heroic offen bleibt, dann in Sekunden schreiben
+python3 heroic_autotag.py --collect
+python3 heroic_autotag.py --write
+
+# diesmal nur 50 neue Spiele abfragen
+python3 heroic_autotag.py --collect --max 50
+
+# die 20 am besten bewerteten Spiele, alle oder nur Koop-Spiele mit voller Controller-Unterstützung
+python3 heroic_autotag.py --top 20
+python3 heroic_autotag.py --top 20 --rule "mode.coop & controller.full"
+
+# ohne Steam-Deck- und Genre-Kategorien, französische Namen
+python3 heroic_autotag.py --without deck genre --language fr
+
+# Cache-Einträge neu abfragen, die älter als 30 Tage sind (Bewertungen ändern sich)
+python3 heroic_autotag.py --refresh 30
+```
+
+## 🧪 Testen
+
+`--test` fragt Spiele online ab und zeigt, was das Skript daraus machen würde. Es **schreibt nichts**, weder in Heroics Konfiguration noch in den Cache. Heroic darf offen bleiben.
+
+Du kannst eine **Anzahl**, einen **Namen** oder beides angeben:
+
+```bash
+python3 heroic_autotag.py --test 5                    # 5 zufällige Spiele aus deiner Bibliothek
+python3 heroic_autotag.py --test "Celeste"            # ein Spiel per Name
+python3 heroic_autotag.py --test witcher              # ein Namensteil reicht, wenn er in deiner Bibliothek eindeutig ist
+python3 heroic_autotag.py --test 3 "Celeste" "Hades"  # 3 zufällige Spiele und zwei per Name
+python3 heroic_autotag.py --test "Celeste" -v         # mit den Rohdaten von Steam / PCGamingWiki
+```
+
+Namen werden mit deiner Heroic-Bibliothek abgeglichen, Groß- und Kleinschreibung spielt keine Rolle. Passt ein Name auf mehrere Spiele, listet das Skript sie auf und testet den Namen wie eingegeben. Namen, die nicht in deiner Bibliothek stehen, werden ebenfalls wie eingegeben getestet.
+
+Zu jedem Spiel siehst du die Suchvarianten, die Steam-AppID oder PCGamingWiki-Seite, die Bewertungen, die Kategorien und ob sie mit dem Cache übereinstimmen:
+
+```
+=== LEGO® Star Wars™: Classic Obi-Wan   (Heroic: legendary)
+  Suchvarianten: ['LEGO® Star Wars™: Classic Obi-Wan', 'LEGO Star Wars: Classic Obi-Wan', 'LEGO Star Wars']
+  Steam-AppID: 920210
+  Gefunden: Steam
+  Bewertungen: Metacritic 78 | Steam Sehr positiv (90%, 38,502)
+  Ergebnis-Kategorien: Controller: voll, Genre: Abenteuer, Genre: Action, Metacritic: 70–79, Modus: Koop, …
+  Cache: gleiche Kategorien
+
+5 Spiele getestet: 4 gefunden, 1 nicht gefunden, 0 Netzfehler. Es wurde nichts geschrieben.
+```
+
+Wird ein Spiel falsch oder gar nicht gefunden, korrigierst du das in der [Datei für eigene Zuordnungen](#-nicht-gefundene-spiele).
+
+Einen vollständigen Lauf erst an einem Teil der Bibliothek ausprobieren: `--max` und `--dry-run` kombinieren:
+
+```bash
+python3 heroic_autotag.py --max 20 --dry-run
+```
+
+Das holt bis zu 20 neue Spiele in den Cache und zeigt die Kategorien, ohne in Heroic zu schreiben.
 
 ## 🌍 Sprachen
 
@@ -178,12 +320,6 @@ python3 heroic_autotag.py --top 20 --rule "mode.coop & controller.full"
 **Woher die Daten kommen:**
 - **Metacritic:** aus den Daten der Steam-Store-Seite, für Spiele, die es nicht auf Steam gibt, aus PCGamingWiki. Bei neuen Spielen keine zusätzliche Abfrage.
 - **Steam-Bewertungen:** gebündelt, 50 Spiele pro Abfrage. Auch große Bibliotheken dauern nur Sekunden.
-
-**Cache von einer älteren Version?** Steam-Bewertungen werden beim nächsten Lauf automatisch ergänzt. Metacritic-Werte brauchen eine Abfrage pro Spiel und werden deshalb nur auf Wunsch nachgeladen:
-
-```bash
-python3 heroic_autotag.py --backfill-ratings
-```
 
 ## 🧩 Einstellungsdatei und Kombis
 
@@ -291,12 +427,110 @@ Heroic darf dabei nicht gleichzeitig laufen. Der erste Lauf dauert bei einer gro
 | `config.json.bak-DATUM-ZEIT` | Sicherung vor jedem Schreiben, neben der `config.json` |
 | `~/.cache/heroic-autotag/cache.json` | Cache, nach Spieltitel gespeichert, auf andere Geräte kopierbar |
 | `~/.config/heroic-autotag/categories.ini` | Einstellungen: Kategorien an/aus, Kombis |
-| `~/.config/heroic-autotag/custom_mapping.txt` | deine eigenen Zuordnungen (ältere Versionen: `eigene_zuordnung.txt`, wird weiter gelesen) |
+| `~/.config/heroic-autotag/custom_mapping.txt` | deine eigenen Zuordnungen |
 | `~/.cache/heroic-autotag/state.json` | merkt sich die Namen der Kombis, damit umbenannte Kombis aufgeräumt werden |
 
 **Rückgängig machen:** Heroic schließen und eine Sicherung über die `config.json` kopieren.
 
-**Umstieg von einer älteren Version** (`heroic_kategorien.py`)? Die Ordner `~/.config/heroic-kategorien` und `~/.cache/heroic-kategorien` werden beim ersten Lauf automatisch auf die neuen Namen umgezogen. Cache und Einstellungen bleiben also erhalten.
+## 🔧 Hilfe bei Problemen
+
+Erste Schritte bei fast jedem Problem:
+
+```bash
+python3 heroic_autotag.py --help               # alle Optionen
+python3 heroic_autotag.py --dry-run            # was geschrieben würde, ohne zu schreiben
+python3 heroic_autotag.py --test "Titel" -v    # was Steam / PCGamingWiki zu einem Spiel liefern
+```
+
+<details>
+<summary><b>„Keine Heroic-Installation gefunden“</b></summary>
+
+Das Skript sucht `~/.config/heroic` (nativ) und `~/.var/app/com.heroicgameslauncher.hgl` (Flatpak). Heroic einmal starten, in den Stores anmelden und die Bibliothek laden lassen. Gibt es beide Installationen, nimmt das Skript die zuletzt benutzte; mit `--native` oder `--flatpak` legst du sie fest.
+</details>
+
+<details>
+<summary><b>„Keine Spiele gefunden“</b></summary>
+
+Heroic hat seine Bibliothek noch nicht gespeichert. Heroic öffnen, warten, bis alle Stores geladen sind, schließen und das Skript erneut starten.
+</details>
+
+<details>
+<summary><b>„Heroic läuft noch“</b></summary>
+
+Heroic überschreibt beim Beenden seine Konfiguration, deshalb schreibt das Skript nur bei geschlossenem Heroic. Heroic komplett beenden, auch das Tray-Symbol. Bei der Flatpak-Version:
+
+```bash
+flatpak kill com.heroicgameslauncher.hgl
+```
+
+Auf den langsamen Teil musst du nicht warten: `--collect` läuft bei offenem Heroic, `--write` dauert danach nur Sekunden.
+</details>
+
+<details>
+<summary><b>Die Kategorien erscheinen nicht in Heroic</b></summary>
+
+- Endete der Lauf mit „Fertig! Sicherung: …“? Mit `--dry-run` oder `--collect` wird nichts geschrieben.
+- Heroic neu starten, es liest die Kategorien nur beim Start.
+- Heroics **Konsolenmodus** zeigt eigene Kategorien derzeit nicht an. Die normale Oberfläche verwenden.
+- Eine Kategorie entsteht nur, wenn mindestens ein Spiel passt (Genres: mindestens zwei, siehe `genre_min_games`).
+</details>
+
+<details>
+<summary><b>Ein Spiel steht in falschen Kategorien oder wird nicht gefunden</b></summary>
+
+1. Prüfen, was das Skript findet: `python3 heroic_autotag.py --test "Titel" -v`
+2. Wurde das falsche oder gar kein Steam-Spiel gefunden, das richtige in die [Datei für eigene Zuordnungen](#-nicht-gefundene-spiele) eintragen, z. B. `Titel = https://store.steampowered.com/app/123456/`
+3. Das Skript erneut starten. Bisher nicht gefundene Spiele sucht `--retry-unknown` noch einmal.
+</details>
+
+<details>
+<summary><b>„Drosselung … alle Threads warten“</b> oder Netzfehler</summary>
+
+Steam begrenzt die Zahl der Abfragen. Das Skript wartet automatisch und macht weiter, es geht nichts verloren. Passiert das oft, weniger Threads verwenden: `--threads 2`. Spiele mit Netzfehler werden beim nächsten Lauf erneut abgefragt.
+</details>
+
+<details>
+<summary><b>Bei manchen Spielen fehlen Bewertungen</b></summary>
+
+- **Metacritic-Werte** gibt es nur für Spiele, die Steam oder PCGamingWiki mit Wertung führen, vor allem größere Titel.
+- **Steam-Bewertungen** brauchen einen Steam-Treffer und eine Mindestzahl an Rezensionen. Spiele, die nur auf PCGamingWiki gefunden werden, bekommen keine.
+- Bewertungen ändern sich: `--refresh 30` fragt Einträge, die älter als 30 Tage sind, neu ab.
+</details>
+
+<details>
+<summary><b>„Fehler in categories.ini“</b></summary>
+
+Die Meldung nennt Abschnitt und Problem, z. B. einen unbekannten Schlüssel in einer Regel (`[combo:4] unbekannter Kategorie-Schlüssel 'mode.koop'`). Die Schlüssel stehen in der Datei selbst. Mit den Standardwerten neu anfangen:
+
+```bash
+python3 heroic_autotag.py --init-config --force
+```
+</details>
+
+<details>
+<summary><b>Falsche Sprache</b></summary>
+
+Die Sprache richtet sich nach der Systemsprache. Mit `--language de` oder dauerhaft mit `language = de` in der `categories.ini` legst du sie fest. Beim Wechsel werden die Kategorien der alten Sprache ersetzt.
+</details>
+
+<details>
+<summary><b>Meine eigene Kategorie wurde verändert</b></summary>
+
+Namen, die mit einem Präfix des Skripts beginnen (`Controller: `, `Modus: `, `Genre: `, `Metacritic: `, … in einer der fünf Sprachen) oder mit dem Kombi-Präfix (`#1 …`), gehören dem Skript und werden bei jedem Lauf neu aufgebaut. Gib deiner Kategorie einen anderen Namen, z. B. `Meine Koop-Spiele`, und hol sie aus einer Sicherung zurück (siehe unten).
+</details>
+
+<details>
+<summary><b>Rückgängig machen oder neu anfangen</b></summary>
+
+- **Einen Lauf rückgängig machen:** Heroic schließen und eine Sicherung `config.json.bak-DATUM-ZEIT` über die `config.json` kopieren (beide im Ordner `store` von Heroic, siehe [Dateien](#-dateien)).
+- **Alles neu abfragen:** `python3 heroic_autotag.py --new`
+</details>
+
+<details>
+<summary><b>Spielmodus: Das Fenster schließt sich zu schnell</b></summary>
+
+Die Ausgabe des letzten Laufs steht in `~/.cache/heroic-autotag/last-run.log`. Das Fenster bleibt 20 Sekunden offen; das änderst du mit der Startoption `WAIT=60 %command%` in den Eigenschaften der Verknüpfung.
+</details>
 
 ## ⚠️ Einschränkungen
 

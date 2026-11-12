@@ -9,7 +9,7 @@ Languages: English, Deutsch, Español, Italiano, Français (--language en|de|es|
 
 Run  python3 heroic_autotag.py --help  for all options. See README.md.
 """
-import argparse, configparser, difflib, json, os, re, shutil, sys, threading, time
+import argparse, configparser, difflib, json, os, random, re, shutil, sys, threading, time
 import urllib.error, urllib.parse, urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -27,34 +27,9 @@ HEROIC, LEGENDARY = NATIVE              # switched in main() if needed
 CONFIG = HEROIC / "store" / "config.json"
 CACHE = Path.home() / ".cache" / "heroic-autotag" / "cache.json"
 CONF_DIR = Path.home() / ".config" / "heroic-autotag"
-OWN_FILE_NEW = CONF_DIR / "custom_mapping.txt"
-OWN_FILE_OLD = CONF_DIR / "eigene_zuordnung.txt"      # name used by older versions
+OWN_FILE = CONF_DIR / "custom_mapping.txt"
 SETTINGS_FILE = CONF_DIR / "categories.ini"
 STATE_FILE = Path.home() / ".cache" / "heroic-autotag" / "state.json"
-
-# folder names of older versions: up to 3.1 "heroic-kategorien", then "heroic-categories"
-OLD_NAMES = ("heroic-categories", "heroic-kategorien")
-
-def migrate_old_files():
-    """Moves data from the old folder names to the new ones (once)."""
-    moved = []
-    for base, new in ((Path.home() / ".config", CONF_DIR), (Path.home() / ".cache", CACHE.parent)):
-        for name in OLD_NAMES:
-            old = base / name
-            if old.is_dir() and not new.exists():
-                new.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(old), str(new))
-                moved.append(f"{old} -> {new}")
-    old_cache = CACHE.parent / "steam_cache.json"
-    if old_cache.exists() and not CACHE.exists():
-        old_cache.rename(CACHE)
-        moved.append(f"{old_cache} -> {CACHE}")
-    return moved
-
-def own_file():
-    if OWN_FILE_NEW.exists() or not OWN_FILE_OLD.exists():
-        return OWN_FILE_NEW
-    return OWN_FILE_OLD
 
 GENRE_MIN = 2          # genre categories with fewer games are skipped
 RUNNERS = ("legendary", "gog", "nile", "sideload")
@@ -132,19 +107,14 @@ def cat_name(key, lang):
 
 NAME2KEY = {cat_name(k, l): k for k in VALUES for l in LANGS}
 PREFIXES = tuple({GROUPS[g][l] + SEP[l] for g in GROUPS for l in LANGS})
-LEGACY = ("Controller", "Controller (teilweise)")    # names from the very first version
 
 def is_script_category(name):
-    return name in NAME2KEY or name.startswith(PREFIXES) or name in LEGACY
+    return name in NAME2KEY or name.startswith(PREFIXES)
 
 # Steam genre ids -> internal keys
 STEAM_GENRES = {"1": "action", "25": "adventure", "3": "rpg", "2": "strategy", "28": "simulation",
                 "9": "racing", "18": "sports", "4": "casual", "23": "indie", "37": "f2p",
                 "29": "mmo", "70": "early_access"}
-# genre names (any language, older caches, Steam's English names) -> internal keys
-GENRE_NAMES = {VALUES[k][l].lower(): k.split(".")[1] for k in VALUES if k.startswith("genre.") for l in LANGS}
-GENRE_NAMES.update({"free to play": "f2p", "massively multiplayer": "mmo", "mmo": "mmo",
-                    "simulation": "simulation", "sports": "sports", "racing": "racing"})
 # PCGamingWiki genres -> internal keys
 PCGW_GENRES = {
     "action": "action", "fps": "action", "tps": "action", "shooter": "action", "platform": "action",
@@ -332,10 +302,16 @@ MSG = {
                        es="añadir los juegos no encontrados como plantilla al archivo de asignaciones propias",
                        it="aggiungere i giochi non trovati come modello al file delle associazioni personalizzate",
                        fr="ajouter les jeux introuvables comme modèle au fichier d'associations personnalisées"),
-    "h_test": dict(en="show what Steam and PCGamingWiki return for a title", de="zeigt, was Steam und PCGamingWiki zu einem Titel liefern",
-                   es="muestra lo que Steam y PCGamingWiki devuelven para un título",
-                   it="mostra cosa restituiscono Steam e PCGamingWiki per un titolo",
-                   fr="affiche ce que Steam et PCGamingWiki renvoient pour un titre"),
+    "h_test": dict(en="test games online without writing anything: a number picks random games from your library, "
+                      "a name tests that game (several allowed, e.g. --test 3 \"Celeste\")",
+                   de="Spiele online testen, ohne etwas zu schreiben: eine Zahl wählt zufällige Spiele aus deiner Bibliothek, "
+                      "ein Name testet dieses Spiel (mehrere möglich, z. B. --test 3 \"Celeste\")",
+                   es="probar juegos en línea sin escribir nada: un número elige juegos al azar de tu biblioteca, "
+                      "un nombre prueba ese juego (se admiten varios, p. ej. --test 3 \"Celeste\")",
+                   it="testare giochi online senza scrivere nulla: un numero sceglie giochi a caso dalla libreria, "
+                      "un nome testa quel gioco (anche più di uno, ad es. --test 3 \"Celeste\")",
+                   fr="tester des jeux en ligne sans rien écrire : un nombre choisit des jeux au hasard dans votre bibliothèque, "
+                      "un nom teste ce jeu (plusieurs possibles, p. ex. --test 3 \"Celeste\")"),
     "h_max": dict(en="fetch at most N new games per run", de="höchstens N neue Spiele pro Lauf abfragen",
                   es="consultar como máximo N juegos nuevos por ejecución", it="richiedere al massimo N nuovi giochi per esecuzione",
                   fr="interroger au plus N nouveaux jeux par exécution"),
@@ -349,10 +325,10 @@ MSG = {
     "h_retry": dict(en="search games that were not found again", de="nicht gefundene Spiele erneut suchen",
                     es="volver a buscar los juegos no encontrados", it="cercare di nuovo i giochi non trovati",
                     fr="rechercher de nouveau les jeux introuvables"),
-    "h_refresh": dict(en="fetch cache entries older than DAYS again (e.g. 30)", de="Cache-Einträge älter als TAGE neu abfragen (z. B. 30)",
-                      es="volver a consultar entradas con más de DÍAS días (p. ej. 30)",
-                      it="richiedere di nuovo le voci più vecchie di GIORNI (es. 30)",
-                      fr="interroger de nouveau les entrées de plus de JOURS jours (p. ex. 30)"),
+    "h_refresh": dict(en="fetch cache entries older than DAYS again (e.g. 30)", de="Cache-Einträge älter als DAYS Tage neu abfragen (z. B. 30)",
+                      es="volver a consultar entradas con más de DAYS días (p. ej. 30)",
+                      it="richiedere di nuovo le voci più vecchie di DAYS giorni (es. 30)",
+                      fr="interroger de nouveau les entrées de plus de DAYS jours (p. ex. 30)"),
     "h_flatpak": dict(en="use the Flatpak version of Heroic (SteamOS)", de="Flatpak-Heroic verwenden (SteamOS)",
                       es="usar la versión Flatpak de Heroic (SteamOS)", it="usare la versione Flatpak di Heroic (SteamOS)",
                       fr="utiliser la version Flatpak de Heroic (SteamOS)"),
@@ -371,11 +347,111 @@ MSG = {
                    fr="langue des catégories et des messages (en, de, es, it, fr)"),
 }
 MSG.update({
-    "h_backfill": dict(en="fetch missing Metacritic scores for games already in the cache (one request per game)",
-                       de="fehlende Metacritic-Werte für Spiele im Cache nachladen (eine Abfrage pro Spiel)",
-                       es="obtener las puntuaciones de Metacritic que faltan de los juegos en la caché (una consulta por juego)",
-                       it="recuperare i punteggi Metacritic mancanti dei giochi nella cache (una richiesta per gioco)",
-                       fr="récupérer les notes Metacritic manquantes des jeux en cache (une requête par jeu)"),
+    "h_verbose": dict(en="with --test: also show the raw data from Steam / PCGamingWiki",
+                      de="mit --test: zusätzlich die Rohdaten von Steam / PCGamingWiki zeigen",
+                      es="con --test: mostrar también los datos sin procesar de Steam / PCGamingWiki",
+                      it="con --test: mostrare anche i dati grezzi di Steam / PCGamingWiki",
+                      fr="avec --test : afficher aussi les données brutes de Steam / PCGamingWiki"),
+    "h_help": dict(en="show this help and exit", de="diese Hilfe anzeigen und beenden",
+                   es="mostrar esta ayuda y salir", it="mostrare questo aiuto ed uscire", fr="afficher cette aide et quitter"),
+    "h_usage": dict(en="usage: ", de="Aufruf: ", es="uso: ", it="uso: ", fr="utilisation : "),
+    "g_actions": dict(en="what to do (default: collect data and write categories)",
+                      de="was soll passieren (ohne Angabe: Daten sammeln und Kategorien schreiben)",
+                      es="qué hacer (por defecto: obtener datos y escribir categorías)",
+                      it="cosa fare (predefinito: raccogliere i dati e scrivere le categorie)",
+                      fr="que faire (par défaut : collecter les données et écrire les catégories)"),
+    "g_fetch": dict(en="fetching", de="Abfragen", es="consultas", it="richieste", fr="requêtes"),
+    "g_output": dict(en="categories and output", de="Kategorien und Ausgabe", es="categorías y salida",
+                     it="categorie e output", fr="catégories et sortie"),
+    "g_setup": dict(en="Heroic and settings", de="Heroic und Einstellungen", es="Heroic y configuración",
+                    it="Heroic e impostazioni", fr="Heroic et réglages"),
+    "examples": dict(
+        en="""examples:
+  python3 heroic_autotag.py                       collect data and write categories
+  python3 heroic_autotag.py --dry-run             show the result, write nothing
+  python3 heroic_autotag.py --test 5              test 5 random games from your library
+  python3 heroic_autotag.py --test "Celeste"      test one game by name
+  python3 heroic_autotag.py --test 3 witcher -v   3 random games + a name, with raw data
+  python3 heroic_autotag.py --collect --max 50    fetch only 50 new games (Heroic may stay open)
+  python3 heroic_autotag.py --write               write from the cache (Heroic closed)
+  python3 heroic_autotag.py --top 20              the 20 best-rated games
+  python3 heroic_autotag.py --top 20 --rule "mode.coop & controller.full"
+  python3 heroic_autotag.py --without deck genre  skip groups
+  python3 heroic_autotag.py --language fr         categories and output in French""",
+        de="""Beispiele:
+  python3 heroic_autotag.py                       Daten sammeln und Kategorien schreiben
+  python3 heroic_autotag.py --dry-run             Ergebnis anzeigen, nichts schreiben
+  python3 heroic_autotag.py --test 5              5 zufällige Spiele aus deiner Bibliothek testen
+  python3 heroic_autotag.py --test "Celeste"      ein Spiel per Name testen
+  python3 heroic_autotag.py --test 3 witcher -v   3 zufällige Spiele + ein Name, mit Rohdaten
+  python3 heroic_autotag.py --collect --max 50    nur 50 neue Spiele abfragen (Heroic darf offen sein)
+  python3 heroic_autotag.py --write               aus dem Cache schreiben (Heroic geschlossen)
+  python3 heroic_autotag.py --top 20              die 20 am besten bewerteten Spiele
+  python3 heroic_autotag.py --top 20 --rule "mode.coop & controller.full"
+  python3 heroic_autotag.py --without deck genre  Gruppen weglassen
+  python3 heroic_autotag.py --language fr         Kategorien und Ausgaben auf Französisch""",
+        es="""ejemplos:
+  python3 heroic_autotag.py                       obtener datos y escribir categorías
+  python3 heroic_autotag.py --dry-run             mostrar el resultado sin escribir nada
+  python3 heroic_autotag.py --test 5              probar 5 juegos al azar de tu biblioteca
+  python3 heroic_autotag.py --test "Celeste"      probar un juego por su nombre
+  python3 heroic_autotag.py --test 3 witcher -v   3 juegos al azar + un nombre, con datos sin procesar
+  python3 heroic_autotag.py --collect --max 50    consultar solo 50 juegos nuevos (Heroic puede seguir abierto)
+  python3 heroic_autotag.py --write               escribir desde la caché (Heroic cerrado)
+  python3 heroic_autotag.py --top 20              los 20 juegos mejor valorados
+  python3 heroic_autotag.py --top 20 --rule "mode.coop & controller.full"
+  python3 heroic_autotag.py --without deck genre  omitir grupos
+  python3 heroic_autotag.py --language fr         categorías y salida en francés""",
+        it="""esempi:
+  python3 heroic_autotag.py                       raccogliere i dati e scrivere le categorie
+  python3 heroic_autotag.py --dry-run             mostrare il risultato senza scrivere nulla
+  python3 heroic_autotag.py --test 5              testare 5 giochi a caso dalla libreria
+  python3 heroic_autotag.py --test "Celeste"      testare un gioco per nome
+  python3 heroic_autotag.py --test 3 witcher -v   3 giochi a caso + un nome, con i dati grezzi
+  python3 heroic_autotag.py --collect --max 50    richiedere solo 50 nuovi giochi (Heroic può restare aperto)
+  python3 heroic_autotag.py --write               scrivere dalla cache (Heroic chiuso)
+  python3 heroic_autotag.py --top 20              i 20 giochi meglio valutati
+  python3 heroic_autotag.py --top 20 --rule "mode.coop & controller.full"
+  python3 heroic_autotag.py --without deck genre  omettere gruppi
+  python3 heroic_autotag.py --language fr         categorie e messaggi in francese""",
+        fr="""exemples :
+  python3 heroic_autotag.py                       collecter les données et écrire les catégories
+  python3 heroic_autotag.py --dry-run             afficher le résultat sans rien écrire
+  python3 heroic_autotag.py --test 5              tester 5 jeux au hasard de votre bibliothèque
+  python3 heroic_autotag.py --test "Celeste"      tester un jeu par son nom
+  python3 heroic_autotag.py --test 3 witcher -v   3 jeux au hasard + un nom, avec les données brutes
+  python3 heroic_autotag.py --collect --max 50    interroger seulement 50 nouveaux jeux (Heroic peut rester ouvert)
+  python3 heroic_autotag.py --write               écrire depuis le cache (Heroic fermé)
+  python3 heroic_autotag.py --top 20              les 20 jeux les mieux notés
+  python3 heroic_autotag.py --top 20 --rule "mode.coop & controller.full"
+  python3 heroic_autotag.py --without deck genre  ignorer des groupes
+  python3 heroic_autotag.py --language fr         catégories et messages en français"""),
+    "t_random": dict(en="{n} random games from your library: {list}", de="{n} zufällige Spiele aus deiner Bibliothek: {list}",
+                     es="{n} juegos al azar de tu biblioteca: {list}", it="{n} giochi a caso dalla libreria: {list}",
+                     fr="{n} jeux au hasard de votre bibliothèque : {list}"),
+    "t_notlib": dict(en="not in your Heroic library, testing the name as typed", de="nicht in deiner Heroic-Bibliothek, teste den Namen wie eingegeben",
+                     es="no está en tu biblioteca de Heroic, se prueba el nombre tal cual", it="non è nella libreria di Heroic, provo il nome così com'è",
+                     fr="pas dans votre bibliothèque Heroic, test du nom tel quel"),
+    "t_maybe": dict(en="  did you mean: {list}", de="  meintest du: {list}", es="  ¿quisiste decir: {list}?",
+                    it="  forse intendevi: {list}", fr="  vouliez-vous dire : {list}"),
+    "t_store": dict(en="Heroic: {stores}", de="Heroic: {stores}", es="Heroic: {stores}", it="Heroic: {stores}", fr="Heroic : {stores}"),
+    "t_found": dict(en="Found:", de="Gefunden:", es="Encontrado:", it="Trovato:", fr="Trouvé :"),
+    "t_ratings": dict(en="Ratings:", de="Bewertungen:", es="Valoraciones:", it="Valutazioni:", fr="Notes :"),
+    "t_custom": dict(en="custom mapping, no online lookup", de="eigene Zuordnung, keine Online-Abfrage",
+                     es="asignación propia, sin consulta en línea", it="associazione personalizzata, nessuna richiesta online",
+                     fr="association personnalisée, pas de requête en ligne"),
+    "t_cache": dict(en="Cache:", de="Cache:", es="Caché:", it="Cache:", fr="Cache :"),
+    "t_cache_same": dict(en="same categories", de="gleiche Kategorien", es="mismas categorías", it="stesse categorie", fr="mêmes catégories"),
+    "t_cache_none": dict(en="not in the cache yet", de="noch nicht im Cache", es="aún no está en la caché",
+                         it="non ancora nella cache", fr="pas encore en cache"),
+    "t_cache_diff": dict(en="differs  new: {plus}  missing: {minus}", de="weicht ab  neu: {plus}  fehlt: {minus}",
+                         es="difiere  nuevas: {plus}  faltan: {minus}", it="diverso  nuove: {plus}  mancanti: {minus}",
+                         fr="diffère  nouvelles : {plus}  manquantes : {minus}"),
+    "t_summary": dict(en="\n{n} games tested: {ok} found, {nf} not found, {err} network errors. Nothing was written.",
+                      de="\n{n} Spiele getestet: {ok} gefunden, {nf} nicht gefunden, {err} Netzfehler. Es wurde nichts geschrieben.",
+                      es="\n{n} juegos probados: {ok} encontrados, {nf} no encontrados, {err} errores de red. No se escribió nada.",
+                      it="\n{n} giochi testati: {ok} trovati, {nf} non trovati, {err} errori di rete. Non è stato scritto nulla.",
+                      fr="\n{n} jeux testés : {ok} trouvés, {nf} introuvables, {err} erreurs réseau. Rien n'a été écrit."),
     "h_top": dict(en="list the N best-rated games (by Metacritic, then Steam reviews)",
                   de="die N am besten bewerteten Spiele auflisten (nach Metacritic, dann Steam-Bewertung)",
                   es="listar los N juegos mejor valorados (por Metacritic y luego reseñas de Steam)",
@@ -386,18 +462,15 @@ MSG.update({
                    es='solo con --top: filtrar por una regla, p. ej. "mode.coop & controller.full"',
                    it='solo con --top: filtrare con una regola, ad es. "mode.coop & controller.full"',
                    fr='uniquement avec --top : filtrer par une règle, p. ex. "mode.coop & controller.full"'),
-    "reviews_fetch": dict(en="Steam reviews: {n} games in {r} requests …", de="Steam-Bewertungen: {n} Spiele in {r} Abfragen …",
-                          es="Reseñas de Steam: {n} juegos en {r} consultas …", it="Recensioni Steam: {n} giochi in {r} richieste …",
-                          fr="Évaluations Steam : {n} jeux en {r} requêtes …"),
+    "reviews_fetch": dict(en="Fetching Steam reviews for {n} games …", de="Steam-Bewertungen für {n} Spiele werden abgefragt …",
+                          es="Consultando reseñas de Steam de {n} juegos …", it="Richiesta delle recensioni Steam di {n} giochi …",
+                          fr="Récupération des évaluations Steam de {n} jeux …"),
     "top_head": dict(en="Title", de="Titel", es="Título", it="Titolo", fr="Titre"),
-    "top_none": dict(en="No ratings in the cache yet. Run the script first (older caches: --backfill-ratings).",
-                     de="Noch keine Bewertungen im Cache. Erst das Skript ausführen (ältere Caches: --backfill-ratings).",
-                     es="Aún no hay valoraciones en la caché. Ejecuta primero el script (cachés antiguas: --backfill-ratings).",
-                     it="Ancora nessuna valutazione nella cache. Esegui prima lo script (cache vecchie: --backfill-ratings).",
-                     fr="Pas encore de notes dans le cache. Lancez d'abord le script (anciens caches : --backfill-ratings)."),
-    "migrated": dict(en="Moved data from an older version: {what}", de="Daten einer älteren Version übernommen: {what}",
-                     es="Datos de una versión anterior trasladados: {what}", it="Dati di una versione precedente spostati: {what}",
-                     fr="Données d'une version précédente déplacées : {what}"),
+    "top_none": dict(en="No ratings in the cache yet. Run the script first.",
+                     de="Noch keine Bewertungen im Cache. Erst das Skript ausführen.",
+                     es="Aún no hay valoraciones en la caché. Ejecuta primero el script.",
+                     it="Ancora nessuna valutazione nella cache. Esegui prima lo script.",
+                     fr="Pas encore de notes dans le cache. Lancez d'abord le script."),
     "h_init": dict(en="create categories.ini with all categories and the default combinations",
                    de="categories.ini mit allen Kategorien und den Standard-Kombis erzeugen",
                    es="crear categories.ini con todas las categorías y las combinaciones predeterminadas",
@@ -483,7 +556,7 @@ def t(key, **kw):
 
 def detect_language(argv):
     for i, a in enumerate(argv):
-        for opt in ("--language", "--sprache"):
+        for opt in ("--language",):
             if a == opt and i + 1 < len(argv):
                 return argv[i + 1][:2].lower() if argv[i + 1][:2].lower() in LANGS else "en"
             if a.startswith(opt + "="):
@@ -830,7 +903,7 @@ def fill_reviews(titles, cache):
     if not todo:
         return
     batches = [todo[i:i + REVIEW_BATCH] for i in range(0, len(todo), REVIEW_BATCH)]
-    print(t("reviews_fetch", n=len(todo), r=len(batches)))
+    print(t("reviews_fetch", n=len(todo)))
     for batch in batches:
         res = steam_reviews(sorted({cache[ti]["appid"] for ti in batch}))
         if res == ERROR:
@@ -962,7 +1035,7 @@ def pcgw_data(page):
 # ============================================================== cache / custom mappings
 def load_custom():
     """custom_mapping.txt -> {title: appid(int) or [category keys/raw names]}"""
-    result, path = {}, own_file()
+    result, path = {}, OWN_FILE
     if not path.exists():
         return result
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -991,19 +1064,14 @@ def save_cache(c):
     CACHE.write_text(json.dumps(c, ensure_ascii=False, indent=1), encoding="utf-8")
 
 def source_of(info):
-    return info.get("source") or info.get("quelle") or "steam"    # "quelle": older versions
+    return info.get("source") or "steam"
 
 SOURCES = {"steam": "Steam", "pcgamingwiki": "PCGamingWiki"}
 
 # ============================================================== categorisation
-def genre_keys(info):
-    if "genre_keys" in info:
-        return info["genre_keys"]
-    return sorted({GENRE_NAMES[g.lower()] for g in info.get("genres", []) if g.lower() in GENRE_NAMES})
-
 def categories_for(info, groups):
     k = set()
-    ids = set(info.get("categories") or info.get("kategorien") or [])
+    ids = set(info.get("categories") or [])
     if "controller" in groups:
         if CTRL_FULL in ids:
             k.add("controller.full")
@@ -1012,7 +1080,7 @@ def categories_for(info, groups):
     if "mode" in groups:
         k.update(name for name, s in MODES.items() if ids & s)
     if "genre" in groups:
-        k.update("genre." + g for g in genre_keys(info))
+        k.update("genre." + g for g in info.get("genre_keys", []))
     deck, machine, steamos = info.get("deck"), info.get("machine"), info.get("steamos")
     if "machine" in groups:
         # Valve: Deck Verified automatically counts as Steam Machine Verified
@@ -1093,7 +1161,7 @@ def one_game(title, custom=None, gog_id=None):
         return ERROR
     return pcgw_data(page) if page else None
 
-def collect(games, cache, threads, maximum, custom, backfill=False):
+def collect(games, cache, threads, maximum, custom):
     gog = {ti: app for (app, r), ti in games.items() if r == "gog"}
     def needs_fetch(ti):
         v = custom.get(ti)
@@ -1101,8 +1169,6 @@ def collect(games, cache, threads, maximum, custom, backfill=False):
             return False
         if isinstance(v, int):
             return not (isinstance(cache.get(ti), dict) and cache[ti].get("appid") == v)
-        if backfill and isinstance(cache.get(ti), dict) and "metacritic" not in cache[ti]:
-            return True                           # entry from a version without ratings
         return ti not in cache
     todo = sorted({ti for ti in games.values() if needs_fetch(ti)}, key=str.lower)
     if maximum:
@@ -1110,7 +1176,7 @@ def collect(games, cache, threads, maximum, custom, backfill=False):
     if not todo:
         print(t("all_cached"))
         return
-    print(t("fetching", n=len(todo), t=threads, m=round(len(todo) * RATE["details"].gap / 60)))
+    print(t("fetching", n=len(todo), t=threads, m=max(1, round(len(todo) * RATE["details"].gap / 60))))
     print(t("ctrl_c"))
     lock, done = threading.Lock(), 0
     with ThreadPoolExecutor(max_workers=threads) as ex:
@@ -1178,7 +1244,7 @@ def write(games, cache, skip, dry_run, custom, settings):
     def is_combo(name):
         return name in old_combos or bool(pattern and pattern.match(name))
     for name, ids in cats.items():
-        if is_script_category(name) and not is_combo(name) and name not in LEGACY and isinstance(ids, list):
+        if is_script_category(name) and not is_combo(name) and isinstance(ids, list):
             key = NAME2KEY.get(name, "raw:" + name)
             facts.setdefault(key, set()).update(back[x] for x in ids if x in no_ids and x in back)
 
@@ -1190,6 +1256,7 @@ def write(games, cache, skip, dry_run, custom, settings):
         elif k not in settings.disabled and k.split(".")[0] not in skip:
             if not k.startswith("genre.") or len(v) >= settings.genre_min:
                 assign[k] = v
+    assign = {k: v for k, v in assign.items() if v}     # empty script categories are removed
     combos = []
     for number, sec, names, tree in settings.combos:
         members = eval_rule(tree, facts, every)
@@ -1249,6 +1316,106 @@ def write(games, cache, skip, dry_run, custom, settings):
     if unknown:
         print(t("unknown_hint", n=len(unknown)))
 
+def pick_test_titles(items, games):
+    """--test arguments -> library titles. Numbers pick random games, names are matched against the library."""
+    library = sorted(set(games.values()), key=str.lower)
+    lower = {ti.lower(): ti for ti in library}
+    chosen = []
+    for item in items:
+        if item.isdigit():
+            rest = [ti for ti in library if ti not in chosen]
+            picked = random.sample(rest, min(int(item), len(rest)))
+            print(t("t_random", n=len(picked), list=", ".join(picked)))
+            chosen += picked
+            continue
+        if item.lower() in lower:
+            chosen.append(lower[item.lower()])
+            continue
+        hits = [ti for ti in library if item.lower() in ti.lower()]
+        if len(hits) == 1:
+            chosen.append(hits[0])
+            continue
+        print(f"{item}: {t('t_notlib')}")
+        if hits:
+            print(t("t_maybe", list=", ".join(hits[:8]) + (" …" if len(hits) > 8 else "")))
+        chosen.append(item)
+    return list(dict.fromkeys(chosen))
+
+def test_one(title, games, groups, custom, cache, verbose):
+    stores = sorted({r for (app, r), ti in games.items() if ti == title})
+    print(f"\n=== {title}" + (f"   ({t('t_store', stores=', '.join(stores))})" if stores else ""))
+    preset = custom.get(title)
+    if isinstance(preset, list):
+        print("  " + t("t_custom"))
+        print("  " + t("t_cats"), ", ".join(sorted(cat_name(k, LANG) for k in preset)))
+        return "ok"
+    print("  " + t("t_variants"), search_variants(title))
+    appid = preset if isinstance(preset, int) else steam_appid(title)
+    print("  " + t("t_appid"), t("st_neterr") if appid == ERROR else appid or "–")
+    if appid == ERROR:
+        return "error"
+    result = None
+    if appid:
+        result = steam_data(appid)
+        if isinstance(result, dict):
+            rv = steam_reviews([appid])
+            result["reviews"] = rv.get(appid) if isinstance(rv, dict) else None
+        if verbose:
+            print("  " + t("t_steam"), json.dumps(result, ensure_ascii=False))
+    if result == ERROR:
+        return "error"
+    if not isinstance(result, dict):
+        gog_id = next((app for (app, r), ti in games.items() if ti == title and r == "gog"), None)
+        page = pcgw_page(title, gog_id)
+        print("  " + t("t_page"), page)
+        if page == ERROR:
+            return "error"
+        if page:
+            if verbose:
+                text = pcgw_wikitext(page)
+                if isinstance(text, str):
+                    print("  " + t("t_wikitext", n=len(text)))
+                    print("  " + t("t_genres", g=wt_list(text, "genres"), m=wt_list(text, "modes")))
+                    for f_ in ("controller support", "full controller", "local play", "local play modes",
+                               "lan play", "online play", "online play modes"):
+                        print(f"    {f_}: {wt_field(text, f_)!r}")
+                else:
+                    print("  " + t("t_nowikitext"), text)
+            result = pcgw_data(page)
+            if verbose:
+                print("  " + t("t_pcgw"), json.dumps(result, ensure_ascii=False))
+            if result == ERROR:
+                return "error"
+    if not isinstance(result, dict):
+        print("  " + t("st_notfound"))
+        return "notfound"
+    print("  " + t("t_found"), SOURCES.get(source_of(result), source_of(result)))
+    rv = result.get("reviews") if isinstance(result.get("reviews"), dict) else {}
+    mc = result.get("metacritic") or "–"
+    st = (f"{VALUES[REVIEW_KEYS[rv['score']]][LANG]} ({rv.get('percent')}%, {rv.get('count') or 0:,})"
+          if rv.get("score") in REVIEW_KEYS else "–")
+    print("  " + t("t_ratings"), f"Metacritic {mc} | Steam {st}")
+    new = categories_for(result, groups)
+    print("  " + t("t_cats"), ", ".join(sorted(cat_name(k, LANG) for k in new)) or "–")
+    old = cache.get(title)
+    if not isinstance(old, dict):
+        print("  " + t("t_cache"), t("t_cache_none"))
+    else:
+        old = categories_for(old, groups)
+        if old == new:
+            print("  " + t("t_cache"), t("t_cache_same"))
+        else:
+            fmt = lambda ks: ", ".join(sorted(cat_name(k, LANG) for k in ks)) or "–"
+            print("  " + t("t_cache"), t("t_cache_diff", plus=fmt(new - old), minus=fmt(old - new)))
+    return "ok"
+
+def run_tests(items, games, groups, custom, cache, verbose):
+    counts = {"ok": 0, "notfound": 0, "error": 0}
+    titles = pick_test_titles(items, games)
+    for title in titles:
+        counts[test_one(title, games, groups, custom, cache, verbose)] += 1
+    print(t("t_summary", n=len(titles), ok=counts["ok"], nf=counts["notfound"], err=counts["error"]))
+
 def top_list(games, cache, custom, n, rule):
     titles = {ti for ti in games.values() if isinstance(cache.get(ti), dict)}
     if rule:
@@ -1282,36 +1449,45 @@ def top_list(games, cache, custom, n, rule):
 def main():
     global LANG, HEROIC, LEGENDARY, CONFIG
     LANG = detect_language(sys.argv[1:])
-    ap = argparse.ArgumentParser(description=t("h_desc") + f" (v{VERSION})")
-    mode = ap.add_mutually_exclusive_group()
-    mode.add_argument("--collect", "--sammeln", action="store_true", help=t("h_collect"))
-    mode.add_argument("--write", "--schreiben", action="store_true", help=t("h_write"))
-    mode.add_argument("--list-unknown", "--liste-unbekannt", action="store_true", help=t("h_list"))
-    mode.add_argument("--template", "--vorlage", action="store_true", help=t("h_template"))
-    mode.add_argument("--test", metavar="TITLE", help=t("h_test"))
-    mode.add_argument("--init-config", "--config-erstellen", action="store_true", help=t("h_init"))
+    class Formatter(argparse.RawDescriptionHelpFormatter):
+        def __init__(self, prog):
+            super().__init__(prog, max_help_position=30, width=min(110, shutil.get_terminal_size().columns))
+        def add_usage(self, usage, actions, groups, prefix=None):
+            super().add_usage(usage, actions, groups, prefix=t("h_usage"))
+    ap = argparse.ArgumentParser(description=t("h_desc") + f" (v{VERSION})", epilog=t("examples"),
+                                 formatter_class=Formatter, add_help=False)
+    g_act = ap.add_argument_group(t("g_actions"))
+    mode = g_act.add_mutually_exclusive_group()
+    mode.add_argument("--collect", action="store_true", help=t("h_collect"))
+    mode.add_argument("--write", action="store_true", help=t("h_write"))
+    mode.add_argument("--test", nargs="+", metavar="N|TITLE", help=t("h_test"))
     mode.add_argument("--top", type=int, metavar="N", help=t("h_top"))
-    ap.add_argument("--rule", metavar="RULE", help=t("h_rule"))
-    ap.add_argument("--backfill-ratings", action="store_true", help=t("h_backfill"))
-    ap.add_argument("--force", action="store_true", help=t("h_force"))
-    ap.add_argument("--config", metavar="FILE", help=t("h_config"))
-    ap.add_argument("--max", type=int, default=0, help=t("h_max"))
-    ap.add_argument("--threads", type=int, default=4, help=t("h_threads"))
-    ap.add_argument("--dry-run", action="store_true", help=t("h_dry"))
-    ap.add_argument("--new", "--neu", action="store_true", help=t("h_new"))
-    ap.add_argument("--retry-unknown", "--nochmal-unbekannt", action="store_true", help=t("h_retry"))
-    ap.add_argument("--refresh", "--auffrischen", type=int, metavar="DAYS", help=t("h_refresh"))
-    inst = ap.add_mutually_exclusive_group()
+    mode.add_argument("--list-unknown", action="store_true", help=t("h_list"))
+    mode.add_argument("--template", action="store_true", help=t("h_template"))
+    mode.add_argument("--init-config", action="store_true", help=t("h_init"))
+    g_act.add_argument("-h", "--help", action="help", help=t("h_help"))
+    g_fetch = ap.add_argument_group(t("g_fetch"))
+    g_fetch.add_argument("--max", type=int, default=0, metavar="N", help=t("h_max"))
+    g_fetch.add_argument("--threads", type=int, default=4, metavar="N", help=t("h_threads"))
+    g_fetch.add_argument("--new", action="store_true", help=t("h_new"))
+    g_fetch.add_argument("--retry-unknown", action="store_true", help=t("h_retry"))
+    g_fetch.add_argument("--refresh", type=int, metavar="DAYS", help=t("h_refresh"))
+    g_out = ap.add_argument_group(t("g_output"))
+    g_out.add_argument("--dry-run", action="store_true", help=t("h_dry"))
+    g_out.add_argument("--rule", metavar="RULE", help=t("h_rule"))
+    g_out.add_argument("-v", "--verbose", action="store_true", help=t("h_verbose"))
+    g_out.add_argument("--without", nargs="+", default=[], choices=sorted(GROUP_ALIASES),
+                       metavar="GROUP", help=t("h_without"))
+    g_out.add_argument("--language", default=None, choices=LANGS, metavar="LANG", help=t("h_lang"))
+    g_set = ap.add_argument_group(t("g_setup"))
+    inst = g_set.add_mutually_exclusive_group()
     inst.add_argument("--flatpak", action="store_true", help=t("h_flatpak"))
-    inst.add_argument("--native", "--nativ", action="store_true", help=t("h_native"))
-    ap.add_argument("--without", "--ohne", nargs="+", default=[], choices=sorted(GROUP_ALIASES),
-                    metavar="GROUP", help=t("h_without"))
-    ap.add_argument("--language", "--sprache", default=None, choices=LANGS, help=t("h_lang"))
+    inst.add_argument("--native", action="store_true", help=t("h_native"))
+    g_set.add_argument("--config", metavar="FILE", help=t("h_config"))
+    g_set.add_argument("--force", action="store_true", help=t("h_force"))
     a = ap.parse_args()
     if a.language:
         LANG = a.language
-    for what in migrate_old_files():
-        print(t("migrated", what=what))
     settings_path = Path(a.config).expanduser() if a.config else SETTINGS_FILE
     if a.init_config:
         if settings_path.exists() and not a.force:
@@ -1344,44 +1520,16 @@ def main():
         limit = time.time() - a.refresh * 86400
         before = len(cache)
         cache = {k: v for k, v in cache.items()
-                 if not isinstance(v, dict) or v.get("_time", v.get("_zeit", 0)) >= limit}
+                 if not isinstance(v, dict) or v.get("_time", 0) >= limit}
         print(t("refresh", n=before - len(cache), d=a.refresh))
     print(t("games_cached", n=len(games), c=sum(ti in cache for ti in set(games.values()))))
 
-    if a.test:
-        print(t("t_variants"), search_variants(a.test))
-        appid = steam_appid(a.test)
-        print(t("t_appid"), appid)
-        result = None
-        if appid and appid != ERROR:
-            result = steam_data(appid)
-            if isinstance(result, dict):
-                rv = steam_reviews([appid])
-                result["reviews"] = rv.get(appid) if isinstance(rv, dict) else None
-            print(t("t_steam"), json.dumps(result, ensure_ascii=False))
-        if not isinstance(result, dict):
-            gog_id = next((app for (app, r), ti in games.items() if ti == a.test and r == "gog"), None)
-            page = pcgw_page(a.test, gog_id)
-            print(t("t_page"), page)
-            if page and page != ERROR:
-                text = pcgw_wikitext(page)
-                if isinstance(text, str):
-                    print(t("t_wikitext", n=len(text)))
-                    print(t("t_genres", g=wt_list(text, "genres"), m=wt_list(text, "modes")))
-                    for f_ in ("controller support", "full controller", "local play", "local play modes",
-                               "lan play", "online play", "online play modes"):
-                        print(f"  {f_}: {wt_field(text, f_)!r}")
-                else:
-                    print(t("t_nowikitext"), text)
-                result = pcgw_data(page)
-                print(t("t_pcgw"), json.dumps(result, ensure_ascii=False))
-        if isinstance(result, dict):
-            print(t("t_cats"), ", ".join(sorted(cat_name(k, LANG) for k in categories_for(result, groups))))
-        return
-
     custom = load_custom()
     if custom:
-        print(t("own_loaded", n=len(custom), path=own_file()))
+        print(t("own_loaded", n=len(custom), path=OWN_FILE))
+    if a.test:
+        run_tests(a.test, games, groups, custom, cache, a.verbose)
+        return
     unknown = sorted({ti for ti in games.values() if ti in cache and not isinstance(cache[ti], dict)
                       and ti not in custom}, key=str.lower)
     if a.top:
@@ -1392,7 +1540,7 @@ def main():
             print("  -", ti)
         return
     if a.template:
-        path = own_file()
+        path = OWN_FILE
         path.parent.mkdir(parents=True, exist_ok=True)
         existing = path.read_text(encoding="utf-8") if path.exists() else ""
         new = [ti for ti in unknown if f"# {ti} =" not in existing and f"{ti} =" not in existing]
@@ -1401,7 +1549,7 @@ def main():
         print(t("template_done", n=len(new), path=path))
         return
     if not a.write:
-        collect(games, cache, max(1, a.threads), a.max, custom, a.backfill_ratings)
+        collect(games, cache, max(1, a.threads), a.max, custom)
         fill_reviews(set(games.values()), cache)
     if not a.collect:
         write(games, cache, skip, a.dry_run, custom, settings)

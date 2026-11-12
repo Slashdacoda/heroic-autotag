@@ -21,8 +21,8 @@ STATUS=${PIPESTATUS[0]}
 UI_LANG="${LC_ALL:-${LC_MESSAGES:-${LANG:-en}}}"
 PREV=""
 for ARG in "$@"; do
-    case "$PREV" in --language|--sprache) UI_LANG="$ARG" ;; esac
-    case "$ARG" in --language=*|--sprache=*) UI_LANG="${ARG#*=}" ;; esac
+    case "$PREV" in --language) UI_LANG="$ARG" ;; esac
+    case "$ARG" in --language=*) UI_LANG="${ARG#*=}" ;; esac
     PREV="$ARG"
 done
 case "$UI_LANG" in
