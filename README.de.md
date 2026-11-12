@@ -1,6 +1,14 @@
-# heroic-autotag
+# 🏷️ heroic-autotag
 
-[English](README.md) · **Deutsch**
+<p align="center">
+  <img alt="Python 3.8+" src="https://img.shields.io/badge/python-3.8%2B-3776AB?logo=python&logoColor=white">
+  <img alt="Heroic 2.11+" src="https://img.shields.io/badge/Heroic-2.11%2B-1d9bf0">
+  <img alt="Linux · SteamOS" src="https://img.shields.io/badge/Linux%20%C2%B7%20SteamOS-supported-1793D1?logo=linux&logoColor=white">
+  <img alt="Dependencies: none" src="https://img.shields.io/badge/dependencies-none-brightgreen">
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-yellow">
+</p>
+
+🇬🇧 [English](README.md) · 🇩🇪 **Deutsch**
 
 Sortiert deine Bibliothek im [Heroic Games Launcher](https://heroicgameslauncher.com) automatisch in Kategorien ein: Controller-Unterstützung, Spielmodi (Koop, Splitscreen, …), Genres sowie Kompatibilität mit Steam Machine, Steam Deck und SteamOS.
 
@@ -17,7 +25,14 @@ Kategorien:
   ...
 ```
 
-## Funktionen
+## 📸 Screenshot
+
+<p align="center">
+  <img src="docs/screenshot-de.png" alt="Heroic-Bibliothek mit von heroic-autotag angelegten Kategorien" width="800">
+  <br><sub>Heroics Kategorien-Filter mit den von heroic-autotag angelegten Kategorien und Kombis</sub>
+</p>
+
+## ✨ Funktionen
 
 - **Kategorien:** Controller-Unterstützung, Spielmodi, Genres, Kompatibilität mit Steam Machine, Steam Deck und SteamOS
 - **Kombis (UND):** z. B. *Controller UND Koop UND Steam Machine*, ganz oben in der Liste
@@ -28,22 +43,22 @@ Kategorien:
 - **Sicher:** sichert Heroics `config.json` vor jedem Schreiben und lässt deine eigenen Kategorien in Ruhe
 - **Starter für den Spielmodus**, um das Skript auf Steam Machine oder Steam Deck per Controller auszuführen
 
-## Voraussetzungen
+## 📋 Voraussetzungen
 
 - Heroic Games Launcher ab Version 2.11 (eigene Kategorien), nativ oder als Flatpak
 - Python ab Version 3.8 (auf den meisten Linux-Distributionen und unter SteamOS vorinstalliert)
 - Internetverbindung
 
-## Installation
+## 📦 Installation
 
 ```bash
-git clone https://github.com/<dein-name>/heroic-autotag.git
+git clone https://github.com/Slashdacoda/heroic-autotag.git
 cd heroic-autotag
 ```
 
 Oder lade nur `heroic_autotag.py` herunter (und `steam-gamemode.sh` für den Spielmodus).
 
-## Schnellstart
+## 🚀 Schnellstart
 
 1. Heroic komplett schließen, auch aus dem Tray.
 2. Ausführen:
@@ -61,7 +76,7 @@ python3 heroic_autotag.py --collect     # Heroic darf offen bleiben
 python3 heroic_autotag.py --write       # vorher Heroic schließen
 ```
 
-## Bedienung
+## ⚙️ Bedienung
 
 | Option | Wirkung |
 |---|---|
@@ -86,7 +101,17 @@ python3 heroic_autotag.py --write       # vorher Heroic schließen
 
 Die deutschen Optionsnamen früherer Versionen (`--sammeln`, `--schreiben`, `--ohne`, …) funktionieren weiterhin.
 
-## Sprachen
+## 🌍 Sprachen
+
+Unterstützte Sprachen für Kategorien und alle Ausgaben:
+
+| | Code | Sprache |
+|---|---|---|
+| 🇬🇧 | `en` | Englisch (Rückfall) |
+| 🇩🇪 | `de` | Deutsch |
+| 🇪🇸 | `es` | Spanisch |
+| 🇮🇹 | `it` | Italienisch |
+| 🇫🇷 | `fr` | Französisch |
 
 Standardmäßig wird die Systemsprache verwendet. Alles außer den fünf unterstützten Sprachen fällt auf Englisch zurück. Mit `--language` legst du die Sprache fest:
 
@@ -96,7 +121,7 @@ python3 heroic_autotag.py --language fr
 
 Beim Sprachwechsel werden die Kategorien in der bisherigen Sprache entfernt und in der neuen angelegt, damit nichts doppelt vorhanden ist.
 
-## Kategorien
+## 🏷️ Kategorien
 
 | Gruppe | Kategorien (Deutsch) |
 |---|---|
@@ -113,7 +138,7 @@ Eine Kategorie entsteht nur, wenn mindestens ein Spiel passt. Bei Genres müssen
 
 **Hinweis:** Kategorien, deren Name mit diesen Präfixen (in einer der fünf Sprachen) oder mit dem Kombi-Präfix (`#1 …`) beginnt, verwaltet das Skript und baut sie bei jedem Lauf neu auf. Gib deinen eigenen Kategorien andere Namen.
 
-## Einstellungsdatei und Kombis
+## 🧩 Einstellungsdatei und Kombis
 
 Heroic verknüpft mehrere ausgewählte Kategorien mit ODER, die Liste wird also länger, je mehr du auswählst. Kombis lösen das: Das Skript berechnet UND-Regeln selbst und legt pro Regel eine eigene Kategorie an.
 
@@ -167,7 +192,7 @@ Eigene Kombis fügst du als `[combo:4]`, `[combo:5]` usw. hinzu. `name.xx` legt 
 
 Eine abgeschaltete Kategorie wird nur nicht angelegt. Kombis nutzen sie trotzdem: Du kannst zum Beispiel die ganze Gruppe „Steam Deck“ abschalten und `deck.verified` trotzdem in einer Regel verwenden.
 
-## Nicht gefundene Spiele
+## 🔍 Nicht gefundene Spiele
 
 1. Mit verbesserter Suche und PCGamingWiki erneut versuchen:
    ```bash
@@ -185,7 +210,7 @@ Eine abgeschaltete Kategorie wird nur nicht angelegt. Kombis nutzen sie trotzdem
 
 Alternativ kannst du solchen Spielen die Kategorien auch direkt in Heroic geben. Das Skript behält sie bei.
 
-## Steam Machine / Steam Deck (Spielmodus)
+## 🎮 Steam Machine / Steam Deck (Spielmodus)
 
 Die Flatpak-Version von Heroic wird automatisch erkannt. So startest du das Skript aus dem Spielmodus per Controller:
 
@@ -200,12 +225,12 @@ Die Flatpak-Version von Heroic wird automatisch erkannt. So startest du das Skri
 
 Heroic darf dabei nicht gleichzeitig laufen. Der erste Lauf dauert bei einer großen Bibliothek eine Weile. Du kannst ihn überspringen, indem du die Cache-Datei von einem anderen PC kopierst (siehe unten).
 
-## Aktualisieren
+## 🔄 Aktualisieren
 
 - **Neue Spiele:** Heroic einmal öffnen, damit es die Bibliothek aktualisiert, schließen und das Skript erneut ausführen. Es werden nur die neuen Spiele abgefragt.
 - **Geänderte Bewertungen:** `--refresh 30` fragt Einträge, die älter als 30 Tage sind, neu ab.
 
-## Dateien
+## 📁 Dateien
 
 | Datei | Zweck |
 |---|---|
@@ -221,7 +246,7 @@ Heroic darf dabei nicht gleichzeitig laufen. Der erste Lauf dauert bei einer gro
 
 **Umstieg von einer älteren Version** (`heroic_kategorien.py`)? Die Ordner `~/.config/heroic-kategorien` und `~/.cache/heroic-kategorien` werden beim ersten Lauf automatisch auf die neuen Namen umgezogen. Cache und Einstellungen bleiben also erhalten.
 
-## Einschränkungen
+## ⚠️ Einschränkungen
 
 - **Heroics Konsolenmodus** filtert derzeit nur nach Store und zeigt keine eigenen Kategorien an. In der normalen Heroic-Oberfläche sind die Kategorien sichtbar.
 - **Steam-Sammlungen** im Spielmodus von SteamOS sind unabhängig von Heroics Kategorien und werden nicht verändert.
@@ -229,13 +254,13 @@ Heroic darf dabei nicht gleichzeitig laufen. Der erste Lauf dauert bei einer gro
 - Spiele aus **PCGamingWiki** bekommen keine Bewertung für Steam Machine, Steam Deck oder SteamOS, weil nur Steam diese liefert.
 - Die Steam-Store-Schnittstellen sind keine offizielle API und können sich ändern.
 
-## Datenquellen
+## 🌐 Datenquellen
 
 - Steam-Store (öffentliche Store-Schnittstellen)
 - [PCGamingWiki](https://www.pcgamingwiki.com)
 
 Dieses Projekt steht in keiner Verbindung zu Valve, Heroic Games Launcher, Epic Games, GOG, Amazon oder PCGamingWiki.
 
-## Lizenz
+## 📄 Lizenz
 
 [MIT](LICENSE): Du darfst das Projekt frei nutzen, verändern, forken und weitergeben, solange der Copyright-Hinweis erhalten bleibt.

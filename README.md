@@ -1,6 +1,14 @@
-# heroic-autotag
+# 🏷️ heroic-autotag
 
-**English** · [Deutsch](README.de.md)
+<p align="center">
+  <img alt="Python 3.8+" src="https://img.shields.io/badge/python-3.8%2B-3776AB?logo=python&logoColor=white">
+  <img alt="Heroic 2.11+" src="https://img.shields.io/badge/Heroic-2.11%2B-1d9bf0">
+  <img alt="Linux · SteamOS" src="https://img.shields.io/badge/Linux%20%C2%B7%20SteamOS-supported-1793D1?logo=linux&logoColor=white">
+  <img alt="Dependencies: none" src="https://img.shields.io/badge/dependencies-none-brightgreen">
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-yellow">
+</p>
+
+🇬🇧 **English** · 🇩🇪 [Deutsch](README.de.md)
 
 Automatically sorts your [Heroic Games Launcher](https://heroicgameslauncher.com) library into categories: controller support, game modes (co-op, split screen, …), genres and Steam Machine / Steam Deck / SteamOS compatibility.
 
@@ -17,7 +25,14 @@ Categories:
   ...
 ```
 
-## Features
+## 📸 Screenshot
+
+<p align="center">
+  <img src="docs/screenshot-de.png" alt="Heroic library with categories created by heroic-autotag (German)" width="800">
+  <br><sub>Heroic's category filter with the categories and combinations created by heroic-autotag (German language)</sub>
+</p>
+
+## ✨ Features
 
 - **Categories:** controller support, game modes, genres, Steam Machine / Steam Deck / SteamOS compatibility
 - **Combinations (AND):** e.g. *controller AND co-op AND Steam Machine*, shown at the top of the list
@@ -28,22 +43,22 @@ Categories:
 - **Safe:** backs up Heroic's `config.json` before every write, never touches your own categories
 - **Game Mode launcher** for running it with a controller on a Steam Machine or Steam Deck
 
-## Requirements
+## 📋 Requirements
 
 - Heroic Games Launcher 2.11 or newer (custom categories), native or Flatpak
 - Python 3.8 or newer (preinstalled on most Linux distributions and on SteamOS)
 - Internet access
 
-## Installation
+## 📦 Installation
 
 ```bash
-git clone https://github.com/<your-user>/heroic-autotag.git
+git clone https://github.com/Slashdacoda/heroic-autotag.git
 cd heroic-autotag
 ```
 
 Or download `heroic_autotag.py` (and `steam-gamemode.sh` for Game Mode) on its own.
 
-## Quick start
+## 🚀 Quick start
 
 1. Close Heroic completely (including the tray icon).
 2. Run:
@@ -61,7 +76,7 @@ python3 heroic_autotag.py --collect     # Heroic may stay open
 python3 heroic_autotag.py --write       # close Heroic first
 ```
 
-## Usage
+## ⚙️ Usage
 
 | Option | What it does |
 |---|---|
@@ -86,7 +101,17 @@ python3 heroic_autotag.py --write       # close Heroic first
 
 The German option names of earlier versions (`--sammeln`, `--schreiben`, `--ohne`, …) still work.
 
-## Languages
+## 🌍 Languages
+
+Supported languages for categories and all output:
+
+| | Code | Language |
+|---|---|---|
+| 🇬🇧 | `en` | English (fallback) |
+| 🇩🇪 | `de` | German |
+| 🇪🇸 | `es` | Spanish |
+| 🇮🇹 | `it` | Italian |
+| 🇫🇷 | `fr` | French |
 
 By default the language is taken from your system language; anything other than the five supported languages falls back to English. Override it with `--language`:
 
@@ -96,7 +121,7 @@ python3 heroic_autotag.py --language fr
 
 When you switch languages, the categories in the previous language are removed and recreated in the new one, so nothing is duplicated.
 
-## Categories
+## 🏷️ Categories
 
 | Group | Categories (English) |
 |---|---|
@@ -113,7 +138,7 @@ A category is only created if at least one game matches; genres need at least tw
 
 **Note:** category names starting with these prefixes (in any of the five languages) and with the combination prefix (`#1 …`) are managed by the script and rebuilt on every run. Give your own categories different names.
 
-## Settings file and combinations
+## 🧩 Settings file and combinations
 
 Heroic combines several selected categories with OR, so the list grows the more you select. Combinations solve this: the script computes AND rules itself and creates one category per rule.
 
@@ -167,7 +192,7 @@ Add your own combinations as `[combo:4]`, `[combo:5]`, and so on. `name.xx` sets
 
 Switching a category off only hides it. Combinations still use it, so you can, for example, switch off the whole Steam Deck group and still use `deck.verified` in a rule.
 
-## Games that are not found
+## 🔍 Games that are not found
 
 1. Try again with improved search and PCGamingWiki:
    ```bash
@@ -185,7 +210,7 @@ Switching a category off only hides it. Combinations still use it, so you can, f
 
 Alternatively, simply assign categories to such games in Heroic itself. The script keeps them.
 
-## Steam Machine / Steam Deck (Game Mode)
+## 🎮 Steam Machine / Steam Deck (Game Mode)
 
 The Heroic Flatpak is detected automatically. To run the script from Game Mode with a controller:
 
@@ -200,12 +225,12 @@ The Heroic Flatpak is detected automatically. To run the script from Game Mode w
 
 Heroic must not be running at the same time. The first run on a large library takes a while; you can copy the cache file from another PC to skip it (see below).
 
-## Updating
+## 🔄 Updating
 
 - **New games:** open Heroic once so it refreshes its library, close it, then run the script again. Only new games are fetched.
 - **Changed ratings:** `--refresh 30` fetches entries older than 30 days again.
 
-## Files
+## 📁 Files
 
 | File | Purpose |
 |---|---|
@@ -221,7 +246,7 @@ Heroic must not be running at the same time. The first run on a large library ta
 
 **Coming from an older version** (`heroic_kategorien.py`)? The folders `~/.config/heroic-kategorien` and `~/.cache/heroic-kategorien` are moved to the new names automatically on the first run, so your cache and settings are kept.
 
-## Limitations
+## ⚠️ Limitations
 
 - **Heroic's Console Mode** currently only filters by store and does not show custom categories. The categories are visible in the normal Heroic interface.
 - **Steam collections** in SteamOS Game Mode are separate from Heroic's categories and are not changed.
@@ -229,13 +254,13 @@ Heroic must not be running at the same time. The first run on a large library ta
 - Games from **PCGamingWiki** get no Steam Machine / Steam Deck / SteamOS ratings, since only Steam provides them.
 - Steam's store endpoints are not an official API and may change.
 
-## Data sources
+## 🌐 Data sources
 
 - Steam store (public store endpoints)
 - [PCGamingWiki](https://www.pcgamingwiki.com)
 
 This project is not affiliated with Valve, Heroic Games Launcher, Epic Games, GOG, Amazon or PCGamingWiki.
 
-## License
+## 📄 License
 
 [MIT](LICENSE): you may use, change, fork and share this project freely, as long as the copyright notice stays in it.
