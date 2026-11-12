@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 heroic_autotag.py - automatically sorts a Heroic Games Launcher library into
-categories (controller support, game modes, genres, Steam Machine / Steam Deck /
+categories (controller support, game modes, genres, ratings, Steam Machine / Steam Deck /
 SteamOS compatibility) using public data from Steam and PCGamingWiki.
 
 No account, no API key, Python standard library only.
@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
-VERSION = "3.2"
+VERSION = "3.3"
 LANGS = ("en", "de", "es", "it", "fr")
 
 # ============================================================== paths
@@ -69,6 +69,9 @@ GROUPS = {
     "machine":    dict(en="Steam Machine", de="Steam Machine", es="Steam Machine", it="Steam Machine", fr="Steam Machine"),
     "deck":       dict(en="Steam Deck", de="Steam Deck", es="Steam Deck", it="Steam Deck", fr="Steam Deck"),
     "steamos":    dict(en="SteamOS", de="SteamOS", es="SteamOS", it="SteamOS", fr="SteamOS"),
+    "metacritic": dict(en="Metacritic", de="Metacritic", es="Metacritic", it="Metacritic", fr="Metacritic"),
+    "reviews":    dict(en="Steam reviews", de="Steam-Bewertungen", es="Reseñas de Steam",
+                       it="Recensioni Steam", fr="Évaluations Steam"),
 }
 SEP = dict(en=": ", de=": ", es=": ", it=": ", fr=" : ")
 
@@ -103,6 +106,23 @@ VALUES = {
     "deck.verified":      dict(en="verified", de="verifiziert", es="verificado", it="verificato", fr="vérifié"),
     "deck.playable":      dict(en="playable", de="spielbar", es="jugable", it="giocabile", fr="jouable"),
     "steamos.compatible": dict(en="compatible", de="kompatibel", es="compatible", it="compatibile", fr="compatible"),
+    # ranges, not thresholds: Heroic combines selected categories with OR, so 90+ and 80-89 = "80 or better"
+    "metacritic.90":      _all("90+"),
+    "metacritic.80":      _all("80–89"),
+    "metacritic.70":      _all("70–79"),
+    "metacritic.low":     dict(en="under 70", de="unter 70", es="menos de 70", it="sotto 70", fr="moins de 70"),
+    # Steam's own review labels (review_score 9..1)
+    "reviews.overwhelmingly_positive": dict(en="Overwhelmingly Positive", de="Äußerst positiv",
+                                            es="Extremadamente positivas", it="Estremamente positive",
+                                            fr="Totalement positives"),
+    "reviews.very_positive":   dict(en="Very Positive", de="Sehr positiv", es="Muy positivas",
+                                    it="Molto positive", fr="Très positives"),
+    "reviews.positive":        dict(en="Positive", de="Positiv", es="Positivas", it="Positive", fr="Positives"),
+    "reviews.mostly_positive": dict(en="Mostly Positive", de="Größtenteils positiv", es="Mayormente positivas",
+                                    it="Perlopiù positive", fr="Plutôt positives"),
+    "reviews.mixed":           dict(en="Mixed", de="Ausgeglichen", es="Variadas", it="Nella media",
+                                    fr="Moitié-moitié"),
+    "reviews.negative":        dict(en="Negative", de="Negativ", es="Negativas", it="Negative", fr="Négatives"),
 }
 
 def cat_name(key, lang):
@@ -155,7 +175,17 @@ MODES = {
 }
 CTRL_FULL, CTRL_PARTIAL = 28, 18
 GROUP_ALIASES = {"controller": "controller", "mode": "mode", "modus": "mode", "genre": "genre",
-                 "machine": "machine", "steammachine": "machine", "deck": "deck", "steamos": "steamos"}
+                 "machine": "machine", "steammachine": "machine", "deck": "deck", "steamos": "steamos",
+                 "metacritic": "metacritic", "reviews": "reviews", "rating": "reviews"}
+REVIEW_KEYS = {9: "reviews.overwhelmingly_positive", 8: "reviews.very_positive", 7: "reviews.positive",
+               6: "reviews.mostly_positive", 5: "reviews.mixed", 4: "reviews.negative",
+               3: "reviews.negative", 2: "reviews.negative", 1: "reviews.negative"}
+
+def metacritic_key(score):
+    if not isinstance(score, int) or score <= 0:
+        return None
+    return ("metacritic.90" if score >= 90 else "metacritic.80" if score >= 80
+            else "metacritic.70" if score >= 70 else "metacritic.low")
 
 # ============================================================== program messages
 MSG = {
@@ -329,11 +359,11 @@ MSG = {
     "h_native": dict(en="use the native Heroic installation (~/.config)", de="natives Heroic verwenden (~/.config)",
                      es="usar la instalación nativa de Heroic (~/.config)", it="usare l'installazione nativa di Heroic (~/.config)",
                      fr="utiliser l'installation native de Heroic (~/.config)"),
-    "h_without": dict(en="skip groups: controller, mode, genre, machine, deck, steamos",
-                      de="Gruppen weglassen: controller, mode, genre, machine, deck, steamos",
-                      es="omitir grupos: controller, mode, genre, machine, deck, steamos",
-                      it="omettere gruppi: controller, mode, genre, machine, deck, steamos",
-                      fr="ignorer des groupes : controller, mode, genre, machine, deck, steamos"),
+    "h_without": dict(en="skip groups: controller, mode, genre, machine, deck, steamos, metacritic, reviews",
+                      de="Gruppen weglassen: controller, mode, genre, machine, deck, steamos, metacritic, reviews",
+                      es="omitir grupos: controller, mode, genre, machine, deck, steamos, metacritic, reviews",
+                      it="omettere gruppi: controller, mode, genre, machine, deck, steamos, metacritic, reviews",
+                      fr="ignorer des groupes : controller, mode, genre, machine, deck, steamos, metacritic, reviews"),
     "h_lang": dict(en="language of categories and output (en, de, es, it, fr)",
                    de="Sprache der Kategorien und Ausgaben (en, de, es, it, fr)",
                    es="idioma de las categorías y la salida (en, de, es, it, fr)",
@@ -341,6 +371,30 @@ MSG = {
                    fr="langue des catégories et des messages (en, de, es, it, fr)"),
 }
 MSG.update({
+    "h_backfill": dict(en="fetch missing Metacritic scores for games already in the cache (one request per game)",
+                       de="fehlende Metacritic-Werte für Spiele im Cache nachladen (eine Abfrage pro Spiel)",
+                       es="obtener las puntuaciones de Metacritic que faltan de los juegos en la caché (una consulta por juego)",
+                       it="recuperare i punteggi Metacritic mancanti dei giochi nella cache (una richiesta per gioco)",
+                       fr="récupérer les notes Metacritic manquantes des jeux en cache (une requête par jeu)"),
+    "h_top": dict(en="list the N best-rated games (by Metacritic, then Steam reviews)",
+                  de="die N am besten bewerteten Spiele auflisten (nach Metacritic, dann Steam-Bewertung)",
+                  es="listar los N juegos mejor valorados (por Metacritic y luego reseñas de Steam)",
+                  it="elencare gli N giochi meglio valutati (per Metacritic, poi recensioni Steam)",
+                  fr="lister les N jeux les mieux notés (par Metacritic, puis évaluations Steam)"),
+    "h_rule": dict(en='only with --top: filter by a rule, e.g. "mode.coop & controller.full"',
+                   de='nur mit --top: nach einer Regel filtern, z. B. "mode.coop & controller.full"',
+                   es='solo con --top: filtrar por una regla, p. ej. "mode.coop & controller.full"',
+                   it='solo con --top: filtrare con una regola, ad es. "mode.coop & controller.full"',
+                   fr='uniquement avec --top : filtrer par une règle, p. ex. "mode.coop & controller.full"'),
+    "reviews_fetch": dict(en="Steam reviews: {n} games in {r} requests …", de="Steam-Bewertungen: {n} Spiele in {r} Abfragen …",
+                          es="Reseñas de Steam: {n} juegos en {r} consultas …", it="Recensioni Steam: {n} giochi in {r} richieste …",
+                          fr="Évaluations Steam : {n} jeux en {r} requêtes …"),
+    "top_head": dict(en="Title", de="Titel", es="Título", it="Titolo", fr="Titre"),
+    "top_none": dict(en="No ratings in the cache yet. Run the script first (older caches: --backfill-ratings).",
+                     de="Noch keine Bewertungen im Cache. Erst das Skript ausführen (ältere Caches: --backfill-ratings).",
+                     es="Aún no hay valoraciones en la caché. Ejecuta primero el script (cachés antiguas: --backfill-ratings).",
+                     it="Ancora nessuna valutazione nella cache. Esegui prima lo script (cache vecchie: --backfill-ratings).",
+                     fr="Pas encore de notes dans le cache. Lancez d'abord le script (anciens caches : --backfill-ratings)."),
     "migrated": dict(en="Moved data from an older version: {what}", de="Daten einer älteren Version übernommen: {what}",
                      es="Datos de una versión anterior trasladados: {what}", it="Dati di una versione precedente spostati: {what}",
                      fr="Données d'une version précédente déplacées : {what}"),
@@ -400,11 +454,11 @@ MSG.update({
                       es="; enabled = false desactiva todo el grupo", it="; enabled = false disattiva l'intero gruppo",
                       fr="; enabled = false désactive tout le groupe"),
     "ini_combo": dict(
-        en="; Combinations: a game is included when the rule is true. They also work if the categories\n; used in the rule are switched off above.\n; Rule: keys like controller.full, mode.coop, genre.rpg, machine.verified, steamos.compatible\n;   &  or  and  = AND     |  or  or  = OR     !  or  not  = NOT     ( ) = grouping\n; name.xx = name per language (en, de, es, it, fr). Add more with [combo:4], [combo:5], ...\n",
-        de="; Kombis: Ein Spiel kommt hinein, wenn die Regel zutrifft. Sie funktionieren auch dann,\n; wenn die verwendeten Kategorien oben abgeschaltet sind.\n; Regel: Schlüssel wie controller.full, mode.coop, genre.rpg, machine.verified, steamos.compatible\n;   &  oder  and  = UND     |  oder  or  = ODER     !  oder  not  = NICHT     ( ) = Klammern\n; name.xx = Name pro Sprache (en, de, es, it, fr). Weitere mit [combo:4], [combo:5], ...\n",
-        es="; Combinaciones: un juego se incluye cuando la regla es verdadera. Funcionan también si las\n; categorías usadas en la regla están desactivadas arriba.\n; Regla: claves como controller.full, mode.coop, genre.rpg, machine.verified, steamos.compatible\n;   &  o  and  = Y     |  o  or  = O     !  o  not  = NO     ( ) = agrupar\n; name.xx = nombre por idioma (en, de, es, it, fr). Añade más con [combo:4], [combo:5], ...\n",
-        it="; Combinazioni: un gioco viene incluso quando la regola è vera. Funzionano anche se le\n; categorie usate nella regola sono disattivate sopra.\n; Regola: chiavi come controller.full, mode.coop, genre.rpg, machine.verified, steamos.compatible\n;   &  o  and  = E     |  o  or  = O     !  o  not  = NON     ( ) = raggruppamento\n; name.xx = nome per lingua (en, de, es, it, fr). Aggiungine altre con [combo:4], [combo:5], ...\n",
-        fr="; Combinaisons : un jeu est inclus lorsque la règle est vraie. Elles fonctionnent aussi si les\n; catégories utilisées dans la règle sont désactivées plus haut.\n; Règle : clés comme controller.full, mode.coop, genre.rpg, machine.verified, steamos.compatible\n;   &  ou  and  = ET     |  ou  or  = OU     !  ou  not  = NON     ( ) = regroupement\n; name.xx = nom par langue (en, de, es, it, fr). Ajoutez-en avec [combo:4], [combo:5], ...\n"),
+        en="; Combinations: a game is included when the rule is true. They also work if the categories\n; used in the rule are switched off above.\n; Rule: keys like controller.full, mode.coop, genre.rpg, machine.verified, metacritic.90\n;   &  or  and  = AND     |  or  or  = OR     !  or  not  = NOT     ( ) = grouping\n; name.xx = name per language (en, de, es, it, fr). Add more with [combo:4], [combo:5], ...\n",
+        de="; Kombis: Ein Spiel kommt hinein, wenn die Regel zutrifft. Sie funktionieren auch dann,\n; wenn die verwendeten Kategorien oben abgeschaltet sind.\n; Regel: Schlüssel wie controller.full, mode.coop, genre.rpg, machine.verified, metacritic.90\n;   &  oder  and  = UND     |  oder  or  = ODER     !  oder  not  = NICHT     ( ) = Klammern\n; name.xx = Name pro Sprache (en, de, es, it, fr). Weitere mit [combo:4], [combo:5], ...\n",
+        es="; Combinaciones: un juego se incluye cuando la regla es verdadera. Funcionan también si las\n; categorías usadas en la regla están desactivadas arriba.\n; Regla: claves como controller.full, mode.coop, genre.rpg, machine.verified, metacritic.90\n;   &  o  and  = Y     |  o  or  = O     !  o  not  = NO     ( ) = agrupar\n; name.xx = nombre por idioma (en, de, es, it, fr). Añade más con [combo:4], [combo:5], ...\n",
+        it="; Combinazioni: un gioco viene incluso quando la regola è vera. Funzionano anche se le\n; categorie usate nella regola sono disattivate sopra.\n; Regola: chiavi come controller.full, mode.coop, genre.rpg, machine.verified, metacritic.90\n;   &  o  and  = E     |  o  or  = O     !  o  not  = NON     ( ) = raggruppamento\n; name.xx = nome per lingua (en, de, es, it, fr). Aggiungine altre con [combo:4], [combo:5], ...\n",
+        fr="; Combinaisons : un jeu est inclus lorsque la règle est vraie. Elles fonctionnent aussi si les\n; catégories utilisées dans la règle sont désactivées plus haut.\n; Règle : clés comme controller.full, mode.coop, genre.rpg, machine.verified, metacritic.90\n;   &  ou  and  = ET     |  ou  or  = OU     !  ou  not  = NON     ( ) = regroupement\n; name.xx = nom par langue (en, de, es, it, fr). Ajoutez-en avec [combo:4], [combo:5], ...\n"),
 })
 
 DEFAULT_COMBOS = [
@@ -442,7 +496,7 @@ def detect_language(argv):
     return "en"
 
 # ============================================================== settings (categories.ini)
-GROUP_ORDER = ("controller", "mode", "genre", "machine", "deck", "steamos")
+GROUP_ORDER = ("controller", "mode", "genre", "machine", "deck", "steamos", "metacritic", "reviews")
 
 def default_ini(lang):
     out = [t("ini_head").rstrip("\n"), "", "[general]", t("ini_general").rstrip("\n"),
@@ -644,7 +698,7 @@ class Rate:
             self.next = max(self.next, time.monotonic() + seconds)
 
 # appdetails is the bottleneck (roughly 200 requests / 5 minutes)
-RATE = {"search": Rate(0.5), "details": Rate(1.6), "deck": Rate(0.5), "pcgw": Rate(1.0)}
+RATE = {"search": Rate(0.5), "details": Rate(1.6), "deck": Rate(0.5), "pcgw": Rate(1.0), "browse": Rate(1.0)}
 PRINT_LOCK = threading.Lock()
 
 def say(text):
@@ -740,6 +794,7 @@ def steam_data(appid):
         "categories": sorted({c.get("id") for c in data.get("categories", []) if c.get("id")}),
         "genre_keys": sorted({STEAM_GENRES[str(g.get("id"))] for g in data.get("genres", [])
                               if str(g.get("id")) in STEAM_GENRES}),
+        "metacritic": (data.get("metacritic") or {}).get("score") or None,
     }
     r = http_json(f"https://store.steampowered.com/saleaction/ajaxgetdeckappcompatibilityreport?nAppID={appid}", "deck")
     if r == ERROR:
@@ -749,6 +804,41 @@ def steam_data(appid):
     info["machine"] = find_resolved(res, "machine")
     info["steamos"] = find_resolved(res, "steamos")
     return info
+
+REVIEW_BATCH = 50
+
+def steam_reviews(appids):
+    """Steam user reviews for many apps in one request -> {appid: {score, percent, count} or None}."""
+    req = {"ids": [{"appid": a} for a in appids], "context": {"language": "english", "country_code": "US"},
+           "data_request": {"include_reviews": True}}
+    d = http_json("https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?"
+                  + urllib.parse.urlencode({"input_json": json.dumps(req)}), "browse")
+    if d == ERROR or not isinstance(d, dict):
+        return ERROR
+    out = {a: None for a in appids}
+    for item in (d.get("response") or {}).get("store_items") or []:
+        r = ((item.get("reviews") or {}).get("summary_filtered")) or {}
+        if item.get("appid") in out and r.get("review_score"):      # 0 = too few reviews
+            out[item["appid"]] = {"score": r["review_score"], "percent": r.get("percent_positive"),
+                                  "count": r.get("review_count")}
+    return out
+
+def fill_reviews(titles, cache):
+    """Adds Steam reviews to cached Steam entries that do not have them yet (batched, cheap)."""
+    todo = sorted({ti for ti in titles if isinstance(cache.get(ti), dict) and cache[ti].get("appid")
+                   and "reviews" not in cache[ti]}, key=str.lower)
+    if not todo:
+        return
+    batches = [todo[i:i + REVIEW_BATCH] for i in range(0, len(todo), REVIEW_BATCH)]
+    print(t("reviews_fetch", n=len(todo), r=len(batches)))
+    for batch in batches:
+        res = steam_reviews(sorted({cache[ti]["appid"] for ti in batch}))
+        if res == ERROR:
+            say(t("st_neterr"))
+            break
+        for ti in batch:
+            cache[ti]["reviews"] = res.get(cache[ti]["appid"])
+    save_cache(cache)
 
 # ============================================================== PCGamingWiki
 PCGW = "https://www.pcgamingwiki.com/w/api.php"
@@ -809,7 +899,11 @@ def wt_list(text, kind):
 def yes(v):
     return str(v or "").strip().lower() in ("true", "limited")
 
-def pcgw_evaluate(genres_raw, modes, cs, fcs, mp, page):
+def wt_metacritic(text):
+    m = re.search(r"\{\{\s*Infobox game/row/reception\s*\|\s*Metacritic\s*\|[^|}]*\|\s*(\d{1,3})\s*\}\}", text, re.I)
+    return int(m.group(1)) if m and int(m.group(1)) > 0 else None
+
+def pcgw_evaluate(genres_raw, modes, cs, fcs, mp, page, metacritic=None):
     ids, modes = set(), modes.lower()
     if "singleplayer" in modes or "single-player" in modes:
         ids.add(2)
@@ -834,7 +928,8 @@ def pcgw_evaluate(genres_raw, modes, cs, fcs, mp, page):
     if not ids and not genres:
         return None
     return {"source": "pcgamingwiki", "page": page, "categories": sorted(ids),
-            "genre_keys": sorted(genres), "deck": None, "machine": None, "steamos": None}
+            "genre_keys": sorted(genres), "deck": None, "machine": None, "steamos": None,
+            "metacritic": metacritic}
 
 def pcgw_data(page):
     text = pcgw_wikitext(page)                    # way 1: read the page's wikitext
@@ -845,7 +940,8 @@ def pcgw_data(page):
               "N": wt_field(text, "lan play"), "NM": wt_field(text, "lan play modes"),
               "O": wt_field(text, "online play"), "OM": wt_field(text, "online play modes")}
         res = pcgw_evaluate(wt_list(text, "genres"), ", ".join(wt_list(text, "modes")),
-                            wt_field(text, "controller support"), wt_field(text, "full controller"), mp, page)
+                            wt_field(text, "controller support"), wt_field(text, "full controller"), mp, page,
+                            wt_metacritic(text))
         if res:
             return res
     p_ = page.replace('"', '\\"')                 # way 2: Cargo database
@@ -931,6 +1027,12 @@ def categories_for(info, groups):
             k.add("deck.playable")
     if "steamos" in groups and steamos in (2, 3):
         k.add("steamos.compatible")
+    if "metacritic" in groups and metacritic_key(info.get("metacritic")):
+        k.add(metacritic_key(info.get("metacritic")))
+    if "reviews" in groups:
+        r = info.get("reviews")
+        if isinstance(r, dict) and r.get("score") in REVIEW_KEYS:
+            k.add(REVIEW_KEYS[r["score"]])
     return k
 
 # ============================================================== Heroic config
@@ -991,7 +1093,7 @@ def one_game(title, custom=None, gog_id=None):
         return ERROR
     return pcgw_data(page) if page else None
 
-def collect(games, cache, threads, maximum, custom):
+def collect(games, cache, threads, maximum, custom, backfill=False):
     gog = {ti: app for (app, r), ti in games.items() if r == "gog"}
     def needs_fetch(ti):
         v = custom.get(ti)
@@ -999,6 +1101,8 @@ def collect(games, cache, threads, maximum, custom):
             return False
         if isinstance(v, int):
             return not (isinstance(cache.get(ti), dict) and cache[ti].get("appid") == v)
+        if backfill and isinstance(cache.get(ti), dict) and "metacritic" not in cache[ti]:
+            return True                           # entry from a version without ratings
         return ti not in cache
     todo = sorted({ti for ti in games.values() if needs_fetch(ti)}, key=str.lower)
     if maximum:
@@ -1145,6 +1249,35 @@ def write(games, cache, skip, dry_run, custom, settings):
     if unknown:
         print(t("unknown_hint", n=len(unknown)))
 
+def top_list(games, cache, custom, n, rule):
+    titles = {ti for ti in games.values() if isinstance(cache.get(ti), dict)}
+    if rule:
+        facts = {}
+        for ti in titles:
+            own = custom.get(ti) if isinstance(custom.get(ti), list) else []
+            for k in categories_for(cache[ti], GROUP_ORDER) | set(own):
+                facts.setdefault(k, set()).add(ti)
+        try:
+            tree = parse_rule(rule, "--rule")
+        except ValueError as e:
+            sys.exit(str(e))
+        titles = eval_rule(tree, facts, titles)
+    def rv(ti):
+        r = cache[ti].get("reviews")
+        return r if isinstance(r, dict) else {}
+    rated = [ti for ti in titles if cache[ti].get("metacritic") or rv(ti).get("percent")]
+    if not rated:
+        print(t("top_none"))
+        return
+    rated.sort(key=lambda ti: (-(cache[ti].get("metacritic") or 0), -(rv(ti).get("percent") or 0),
+                               -(rv(ti).get("count") or 0), ti.lower()))
+    print(f"\n{'#':>4}  {'Metacritic':>10}  {'Steam':>16}  {t('top_head')}")
+    for i, ti in enumerate(rated[:n], 1):
+        mc = cache[ti].get("metacritic") or "–"
+        r = rv(ti)
+        st = f"{r['percent']}% ({r.get('count') or 0:,})" if r.get("percent") is not None else "–"
+        print(f"{i:>4}  {mc:>10}  {st:>16}  {ti}")
+
 # ============================================================== main
 def main():
     global LANG, HEROIC, LEGENDARY, CONFIG
@@ -1157,6 +1290,9 @@ def main():
     mode.add_argument("--template", "--vorlage", action="store_true", help=t("h_template"))
     mode.add_argument("--test", metavar="TITLE", help=t("h_test"))
     mode.add_argument("--init-config", "--config-erstellen", action="store_true", help=t("h_init"))
+    mode.add_argument("--top", type=int, metavar="N", help=t("h_top"))
+    ap.add_argument("--rule", metavar="RULE", help=t("h_rule"))
+    ap.add_argument("--backfill-ratings", action="store_true", help=t("h_backfill"))
     ap.add_argument("--force", action="store_true", help=t("h_force"))
     ap.add_argument("--config", metavar="FILE", help=t("h_config"))
     ap.add_argument("--max", type=int, default=0, help=t("h_max"))
@@ -1219,6 +1355,9 @@ def main():
         result = None
         if appid and appid != ERROR:
             result = steam_data(appid)
+            if isinstance(result, dict):
+                rv = steam_reviews([appid])
+                result["reviews"] = rv.get(appid) if isinstance(rv, dict) else None
             print(t("t_steam"), json.dumps(result, ensure_ascii=False))
         if not isinstance(result, dict):
             gog_id = next((app for (app, r), ti in games.items() if ti == a.test and r == "gog"), None)
@@ -1245,6 +1384,9 @@ def main():
         print(t("own_loaded", n=len(custom), path=own_file()))
     unknown = sorted({ti for ti in games.values() if ti in cache and not isinstance(cache[ti], dict)
                       and ti not in custom}, key=str.lower)
+    if a.top:
+        top_list(games, cache, custom, a.top, a.rule)
+        return
     if a.list_unknown:
         for ti in unknown:
             print("  -", ti)
@@ -1259,7 +1401,8 @@ def main():
         print(t("template_done", n=len(new), path=path))
         return
     if not a.write:
-        collect(games, cache, max(1, a.threads), a.max, custom)
+        collect(games, cache, max(1, a.threads), a.max, custom, a.backfill_ratings)
+        fill_reviews(set(games.values()), cache)
     if not a.collect:
         write(games, cache, skip, a.dry_run, custom, settings)
 

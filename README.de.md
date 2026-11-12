@@ -10,7 +10,7 @@
 
 🇬🇧 [English](README.md) · 🇩🇪 **Deutsch**
 
-Sortiert deine Bibliothek im [Heroic Games Launcher](https://heroicgameslauncher.com) automatisch in Kategorien ein: Controller-Unterstützung, Spielmodi (Koop, Splitscreen, …), Genres sowie Kompatibilität mit Steam Machine, Steam Deck und SteamOS.
+Sortiert deine Bibliothek im [Heroic Games Launcher](https://heroicgameslauncher.com) automatisch in Kategorien ein: Controller-Unterstützung, Spielmodi (Koop, Splitscreen, …), Genres, Bewertungen (Metacritic, Steam) sowie Kompatibilität mit Steam Machine, Steam Deck und SteamOS.
 
 Eine einzige Python-Datei, nur Standardbibliothek. Kein Konto, kein API-Schlüssel. Funktioniert mit der nativen Heroic-Installation und mit der Flatpak-Version (SteamOS, Steam Machine, Steam Deck).
 
@@ -28,13 +28,14 @@ Kategorien:
 ## 📸 Screenshot
 
 <p align="center">
-  <img src="docs/screenshot-de.png" alt="Heroic-Bibliothek mit von heroic-autotag angelegten Kategorien" width="800">
+  <img src="docs/screenshot-de-combination.png" alt="Heroic-Bibliothek mit von heroic-autotag angelegten Kategorien" width="800">
   <br><sub>Heroics Kategorien-Filter mit den von heroic-autotag angelegten Kategorien und Kombis</sub>
 </p>
 
 ## ✨ Funktionen
 
 - **Kategorien:** Controller-Unterstützung, Spielmodi, Genres, Kompatibilität mit Steam Machine, Steam Deck und SteamOS
+- **Bewertungen:** Metacritic-Bereiche und Steam-Bewertungen als Kategorien, dazu eine Rangliste deiner am besten bewerteten Spiele (`--top`)
 - **Kombis (UND):** z. B. *Controller UND Koop UND Steam Machine*, ganz oben in der Liste
 - **Einstellungsdatei:** jede Kategorie ein- oder ausschalten und eigene Kombis festlegen, in `categories.ini`
 - **Fünf Sprachen** für Kategorien und alle Ausgaben: Englisch, Deutsch, Spanisch, Italienisch, Französisch
@@ -87,8 +88,11 @@ python3 heroic_autotag.py --write       # vorher Heroic schließen
 | `--max N` | höchstens N neue Spiele pro Lauf abfragen |
 | `--threads N` | parallele Threads (Standard 4) |
 | `--language en\|de\|es\|it\|fr` | Sprache der Kategorien und Ausgaben |
-| `--without GRUPPE …` | Gruppen weglassen: `controller`, `mode`, `genre`, `machine`, `deck`, `steamos` |
+| `--without GRUPPE …` | Gruppen weglassen: `controller`, `mode`, `genre`, `machine`, `deck`, `steamos`, `metacritic`, `reviews` |
 | `--refresh TAGE` | Cache-Einträge älter als TAGE neu abfragen (Bewertungen ändern sich) |
+| `--top N` | die N am besten bewerteten Spiele auflisten (Metacritic, dann Steam-Bewertung) |
+| `--rule "…"` | mit `--top`: nur Spiele, die eine Regel erfüllen, z. B. `"mode.coop & controller.full"` |
+| `--backfill-ratings` | fehlende Metacritic-Werte für Spiele im Cache nachladen |
 | `--retry-unknown` | nicht gefundene Spiele erneut suchen |
 | `--list-unknown` | nirgends gefundene Spiele auflisten |
 | `--template` | nicht gefundene Spiele als Vorlage in die Datei für eigene Zuordnungen eintragen |
@@ -131,12 +135,55 @@ Beim Sprachwechsel werden die Kategorien in der bisherigen Sprache entfernt und 
 | Steam Machine | verifiziert, spielbar |
 | Steam Deck | verifiziert, spielbar |
 | SteamOS | kompatibel |
+| Metacritic | 90+, 80–89, 70–79, unter 70 |
+| Steam-Bewertungen | Äußerst positiv, Sehr positiv, Positiv, Größtenteils positiv, Ausgeglichen, Negativ |
 
 Eine Kategorie entsteht nur, wenn mindestens ein Spiel passt. Bei Genres müssen es mindestens zwei Spiele sein.
 
 **Steam Machine:** Valve wertet Spiele mit „Steam Deck verifiziert“ automatisch auch als „Steam Machine verifiziert“. Das Skript übernimmt diese Regel, wenn Steam für ein Spiel noch keine eigene Steam-Machine-Bewertung hat.
 
 **Hinweis:** Kategorien, deren Name mit diesen Präfixen (in einer der fünf Sprachen) oder mit dem Kombi-Präfix (`#1 …`) beginnt, verwaltet das Skript und baut sie bei jedem Lauf neu auf. Gib deinen eigenen Kategorien andere Namen.
+
+## ⭐ Bewertungen
+
+Heroic kann nur nach Titel sortieren. Die Bewertungen gibt es deshalb auf zwei Wegen:
+
+**Als Kategorien** zum Filtern. Metacritic verwendet Bereiche statt Schwellen: Heroic verknüpft ausgewählte Kategorien mit ODER. Wählst du *90+* und *80–89*, bekommst du alle Spiele ab 80.
+
+<table>
+  <tr>
+    <td><img src="docs/screenshot-de-metacritic.png" alt="Heroic, gefiltert nach der Kategorie Metacritic: 80–89"></td>
+    <td><img src="docs/screenshot-de-steam-rating.png" alt="Heroic, gefiltert nach der Kategorie Steam-Bewertungen: Äußerst positiv"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Metacritic: 80–89</sub></td>
+    <td align="center"><sub>Steam-Bewertungen: Äußerst positiv</sub></td>
+  </tr>
+</table>
+
+**Als Rangliste** im Terminal, auf Wunsch mit einer Regel gefiltert (gleiche Schlüssel wie bei den Kombis unten):
+
+```bash
+python3 heroic_autotag.py --top 20
+python3 heroic_autotag.py --top 20 --rule "mode.coop & controller.full"
+```
+
+```
+   #  Metacritic             Steam  Titel
+   1          93     96% (843,102)  The Witcher 3: Wild Hunt
+   2          89     95% (221,111)  It Takes Two
+   3          88     97% (134,389)  Celeste
+```
+
+**Woher die Daten kommen:**
+- **Metacritic:** aus den Daten der Steam-Store-Seite, für Spiele, die es nicht auf Steam gibt, aus PCGamingWiki. Bei neuen Spielen keine zusätzliche Abfrage.
+- **Steam-Bewertungen:** gebündelt, 50 Spiele pro Abfrage. Auch große Bibliotheken dauern nur Sekunden.
+
+**Cache von einer älteren Version?** Steam-Bewertungen werden beim nächsten Lauf automatisch ergänzt. Metacritic-Werte brauchen eine Abfrage pro Spiel und werden deshalb nur auf Wunsch nachgeladen:
+
+```bash
+python3 heroic_autotag.py --backfill-ratings
+```
 
 ## 🧩 Einstellungsdatei und Kombis
 
@@ -177,7 +224,7 @@ name.de = Controller + Koop + Steam Machine
 | 2 | Controller (voll oder teilweise) UND (Splitscreen oder Koop) UND SteamOS-kompatibel |
 | 3 | Controller (voll oder teilweise) UND (SteamOS-kompatibel oder Steam Machine verifiziert/spielbar) |
 
-**Regeln** verwenden die Schlüssel aus den Abschnitten in der Form `gruppe.schlüssel` (z. B. `controller.full`, `mode.coop`, `genre.rpg`, `machine.verified`, `steamos.compatible`):
+**Regeln** verwenden die Schlüssel aus den Abschnitten in der Form `gruppe.schlüssel` (z. B. `controller.full`, `mode.coop`, `genre.rpg`, `machine.verified`, `steamos.compatible`, `metacritic.90`, `reviews.very_positive`):
 
 | Operator | Bedeutung |
 |---|---|
@@ -251,7 +298,9 @@ Heroic darf dabei nicht gleichzeitig laufen. Der erste Lauf dauert bei einer gro
 - **Heroics Konsolenmodus** filtert derzeit nur nach Store und zeigt keine eigenen Kategorien an. In der normalen Heroic-Oberfläche sind die Kategorien sichtbar.
 - **Steam-Sammlungen** im Spielmodus von SteamOS sind unabhängig von Heroics Kategorien und werden nicht verändert.
 - **SteamOS-Kompatibilität** wird aus einem nicht dokumentierten Steam-Feld gelesen und kann leer bleiben.
-- Spiele aus **PCGamingWiki** bekommen keine Bewertung für Steam Machine, Steam Deck oder SteamOS, weil nur Steam diese liefert.
+- Spiele aus **PCGamingWiki** bekommen keine Bewertung für Steam Machine, Steam Deck oder SteamOS und keine Steam-Bewertung, weil nur Steam diese liefert.
+- **Metacritic-Werte** gibt es nur für Spiele, die Steam oder PCGamingWiki mit Wertung führen, vor allem größere Titel.
+- Heroic selbst kann nicht nach Bewertung **sortieren**. Zum Filtern dienen die Kategorien, für eine Rangliste `--top`.
 - Die Steam-Store-Schnittstellen sind keine offizielle API und können sich ändern.
 
 ## 🌐 Datenquellen
